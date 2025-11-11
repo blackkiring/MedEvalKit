@@ -1,4 +1,6 @@
 *pyc
+datas/
+eval_results/
 datas/OmniMedVQA
 datas/PMC-VQA
 datas/SLAKE

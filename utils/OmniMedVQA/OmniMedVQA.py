@@ -155,7 +155,7 @@ class OmniMedVQA(BaseDataset):
                 raise ValueError("Chunk inference is not support for download. Try to run eval.sh insteal of eval_chunked.sh")
             print("Start downloading the OmniMedVQA dataset...")
             url="https://huggingface.co/datasets/foreverbeliever/OmniMedVQA/resolve/main/OmniMedVQA.zip"
-            self._download_file_local(local_path=self.dataset_path,url=url)
+            self._download_file_local(local_path=os.path.dirname(self.dataset_path),url=url)
             self._unzip_img_zip_local(local_path=os.path.dirname(self.dataset_path),zip_filename="OmniMedVQA.zip")
             print("Download and extraction completed successfully")
 

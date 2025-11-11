@@ -36,6 +36,7 @@ class MedXpertQA(BaseDataset):
     
 
     def load_data(self):
+        # self.maybe_download_dataset()
         dataset = load_dataset(self.hf_path,self.split,cache_dir=self.dataset_path)["test"]
         self.maybe_download_dataset()
         for idx,sample in tqdm(enumerate(dataset)):
@@ -113,7 +114,8 @@ class MedXpertQA(BaseDataset):
         return metrics,out_samples
     
     def maybe_download_dataset(self):
-        if not os.path.exists(self.dataset_path):
+        # print(self.dataset_path)
+        if os.path.exists(self.dataset_path):
             if self.chunk_idx!=0:
                 raise ValueError("Chunk inference is not support for download. Try to run eval.sh insteal of eval_chunked.sh")
             img_path = os.path.join(self.dataset_path, "images")
