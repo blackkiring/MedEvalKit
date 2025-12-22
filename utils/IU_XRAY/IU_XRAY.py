@@ -52,7 +52,7 @@ class IU_XRAY(BaseDataset):
         findings = "None" if findings.strip() == "" else findings
         impression = "None" if impression.strip() == "" else impression
         
-        prompt = get_report_generation_promp()
+        prompt = get_report_generation_prompt()
 
         messages = {"prompt":prompt,"images":images}
         sample["messages"] = messages
