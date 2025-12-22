@@ -65,7 +65,7 @@ def main():
 
     args = parser.parse_args()
 
-    os.environ["VLLM_USE_V1"] = "0"
+    # os.environ["VLLM_USE_V1"] = "0"
 
     # llm judge setting
     if args.api_key == "None" and args.use_llm_judge == "True":
@@ -92,9 +92,9 @@ def main():
         os.environ["CUDA_VISIBLE_DEVICES"] = args.cuda_visible_devices
     if args.use_vllm == "True":
         os.environ["tensor_parallel_size"] = args.tensor_parallel_size
-        if int(args.tensor_parallel_size) > 1:
-            os.environ["VLLM_WORKER_MULTIPROC_METHOD"] = "spawn"
-            os.environ["TOKENIZERS_PARALLELISM"] = "false"
+        # if int(args.tensor_parallel_size) > 1:
+        os.environ["VLLM_WORKER_MULTIPROC_METHOD"] = "spawn"
+        os.environ["TOKENIZERS_PARALLELISM"] = "false"
     else:
         torch.multiprocessing.set_start_method('spawn')
         os.environ["num_chunks"] = args.num_chunks
