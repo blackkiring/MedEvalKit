@@ -4,6 +4,7 @@ import random
 import numpy as np
 from tqdm import tqdm  
 import json
+import time
 from argparse import ArgumentParser
 from LLMs import init_llm
 import gc
@@ -118,8 +119,22 @@ def main():
         os.makedirs(eval_output_path, exist_ok=True)
         benchmark = prepare_benchmark(model,eval_dataset,eval_dataset_path,eval_output_path)
         benchmark.load_data()
+        
+        # 记录开始时间
+        start_time = time.time()
         final_results = benchmark.eval() if benchmark else {}
+        # 记录结束时间并计算总时间
+        end_time = time.time()
+        inference_time = end_time - start_time
+        
+        # 在结果中添加时间信息
+        if isinstance(final_results, dict):
+            final_results['inference_time'] = inference_time
+            final_results['avg_time_per_sample'] = inference_time / len(benchmark.samples) if hasattr(benchmark, 'samples') else None
+        
         print(f'final results on {eval_dataset}: {final_results}')
+        print(f'Total inference time: {inference_time:.2f} seconds')
+        
         if final_results is not None:
             if os.path.exists(total_results_path):
                 with open (total_results_path,"r") as f:
