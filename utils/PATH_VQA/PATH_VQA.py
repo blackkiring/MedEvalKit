@@ -120,16 +120,22 @@ class PATH_VQA(BaseDataset):
 
 
         if os.environ.get("use_llm_judge","False") == "True":
-            metrics["total metrics"]["right"] = 0
+            metrics["total metrics"]["right"] = metrics["close"]["right"]
             metrics["open"]["right"] = 0
-            metrics["close"]["right"] = 0
             llm = judger
             results = llm.generate_outputs(messages_list)
             for i,result in zip(open_id,results):
-                result = extract(result,"judge")
-                result = True if result == "0" else False
-                out_samples[i]["correct"] = result
-                if result:
+                out_samples[i]["llm_judge_response"] = result
+                if result is None:
+                    # LLM judge failed, fall back to exact match
+                    out_samples[i]["llm_judge_success"] = False
+                    judge_result = out_samples[i]["metrics"]["em"]
+                else:
+                    out_samples[i]["llm_judge_success"] = True
+                    judge_result = extract(result, "judge")
+                    judge_result = True if judge_result == "0" else False
+                out_samples[i]["correct"] = judge_result
+                if judge_result:
                     metrics["open"]["right"] += 1
                     metrics["total metrics"]["right"] += 1
 
