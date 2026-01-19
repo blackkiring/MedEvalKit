@@ -115,16 +115,18 @@ class MedXpertQA(BaseDataset):
     
     def maybe_download_dataset(self):
         # print(self.dataset_path)
-        if os.path.exists(self.dataset_path):
-            if self.chunk_idx!=0:
-                raise ValueError("Chunk inference is not support for download. Try to run eval.sh insteal of eval_chunked.sh")
-            img_path = os.path.join(self.dataset_path, "images")
-            if len(os.listdir(img_path)) == 0:
-                print("Start downloading the MedXpertQA dataset...")
-                url="https://huggingface.co/datasets/TsinghuaC3I/MedXpertQA/resolve/main/images.zip"
-                self._download_file_local(local_path=self.dataset_path,url=url)
-                self._unzip_img_zip_local(local_path=self.dataset_path,zip_filename="images.zip")
-                print("Download and extraction completed successfully")
+        if self.chunk_idx!=0:
+            return  # Skip download check for chunk workers
+
+        img_path = os.path.join(self.dataset_path, "images")
+        # Check if images directory doesn't exist or is empty
+        if not os.path.exists(img_path) or len(os.listdir(img_path)) == 0:
+            print("Start downloading the MedXpertQA images...")
+            os.makedirs(self.dataset_path, exist_ok=True)
+            url="https://huggingface.co/datasets/TsinghuaC3I/MedXpertQA/resolve/main/images.zip"
+            self._download_file_local(local_path=self.dataset_path,url=url)
+            self._unzip_img_zip_local(local_path=self.dataset_path,zip_filename="images.zip")
+            print("Download and extraction completed successfully")
 
     
         

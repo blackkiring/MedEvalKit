@@ -18,7 +18,8 @@ class MIMIC_CXR(BaseDataset):
     def __init__(self,model,dataset_path,output_path):
         self.model = model
         self.output_path = output_path
-        self.dataset_path = dataset_path
+        # MIMIC_CXR requires manual download, set default path if not provided
+        self.dataset_path = dataset_path if dataset_path is not None else './datas/MIMIC_CXR'
         self.samples = []
         self.chunk_idx = int(os.environ.get("chunk_idx",0))
         self.num_chunks = int(os.environ.get("num_chunks",1))
