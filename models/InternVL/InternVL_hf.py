@@ -17,6 +17,7 @@ class InternVL:
                     )
 
         self.tokenizer = AutoTokenizer.from_pretrained(model_path, trust_remote_code=True, use_fast=False)
+        self.tokenizer.pad_token_id = self.tokenizer.eos_token_id
         self.generation_config ={ 
             'max_new_tokens': args.max_new_tokens,
             'repetition_penalty': args.repetition_penalty,
