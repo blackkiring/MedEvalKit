@@ -24,6 +24,8 @@ dependencies = [
     # transformers and vllm are installed from submodules via ./install_deps.sh
     # "transformers",
     # "vllm>=0.2.6",
+    # llava has version conflict (requires torchvision==0.16.2), install manually:
+    # uv pip install --no-deps "llava @ git+https://github.com/haotian-liu/LLaVA.git"
 ]
 
 [project.optional-dependencies]

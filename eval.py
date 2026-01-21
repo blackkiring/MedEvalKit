@@ -44,6 +44,8 @@ def main():
     parser.add_argument('--tensor_parallel_size', type=str, default="1")
     parser.add_argument('--use_vllm', type=str, default="True")
     parser.add_argument('--reasoning', type=str, default="False")
+    parser.add_argument('--enable_thinking', type=str, default="False",
+                        help='Enable Qwen3 thinking mode (default: False)')
 
     parser.add_argument('--num_chunks', type=str, default="1")
     parser.add_argument('--chunk_idx', type=str, default="0")

@@ -35,9 +35,28 @@ class Qwen2VL:
             from models.Qwen2_VL_MoE.Qwen2_VL_hf import Qwen2VL
         return Qwen2VL(model_path, args)
 
-@LLMRegistry.register("Qwen2.5-VL") 
+@LLMRegistry.register("Qwen2.5-VL")
 class Qwen2_5_VL:
     def __new__(cls, model_path: str, args: Any) -> Any:
+        if os.environ.get("use_vllm", "True") == "True":
+            from models.Qwen2_5_VL.Qwen2_5_VL_vllm import Qwen2_5_VL
+        else:
+            from models.Qwen2_5_VL.Qwen2_5_VL_hf import Qwen2_5_VL
+        return Qwen2_5_VL(model_path, args)
+
+@LLMRegistry.register("Qwen3-VL")
+class Qwen3VL:
+    def __new__(cls, model_path: str, args: Any) -> Any:
+        if os.environ.get("use_vllm", "True") == "True":
+            from models.Qwen3_VL.Qwen3_VL_vllm import Qwen3_VL
+        else:
+            from models.Qwen3_VL.Qwen3_VL_hf import Qwen3_VL
+        return Qwen3_VL(model_path, args)
+
+@LLMRegistry.register("Lingshu")
+class Lingshu:
+    def __new__(cls, model_path: str, args: Any) -> Any:
+        # Lingshu is based on Qwen2.5-VL architecture, reuse the same implementation
         if os.environ.get("use_vllm", "True") == "True":
             from models.Qwen2_5_VL.Qwen2_5_VL_vllm import Qwen2_5_VL
         else:
@@ -157,6 +176,14 @@ class MedDr:
     def __new__(cls, model_path: str, args: Any) -> Any:
         from models.MedDr.MedDr import MedDr
         return MedDr(model_path, args)
+
+@LLMRegistry.register("Hulu-Med")
+class HuluMed:
+    def __new__(cls, model_path: str, args: Any) -> Any:
+        # Hulu-Med uses custom HulumedQwen2ForCausalLM architecture
+        # Only HF implementation available (requires trust_remote_code)
+        from models.Hulu_Med.Hulu_Med_hf import Hulu_Med
+        return Hulu_Med(model_path, args)
 
 def init_llm(args):
     try:

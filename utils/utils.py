@@ -37,8 +37,34 @@ def bleu(pred,target,n):
     return sentence_bleu([tokenized_target], tokenized_pred, weights=weights)
 
 def rouge(pred,target):
+    # Handle empty predictions or targets
+    if not pred or not pred.strip():
+        return [{'rouge-1': {'f': 0.0, 'p': 0.0, 'r': 0.0},
+                 'rouge-2': {'f': 0.0, 'p': 0.0, 'r': 0.0},
+                 'rouge-l': {'f': 0.0, 'p': 0.0, 'r': 0.0}}]
+    if not target or not target.strip():
+        return [{'rouge-1': {'f': 0.0, 'p': 0.0, 'r': 0.0},
+                 'rouge-2': {'f': 0.0, 'p': 0.0, 'r': 0.0},
+                 'rouge-l': {'f': 0.0, 'p': 0.0, 'r': 0.0}}]
+
+    # 截断过长的文本以防止ROUGE-L计算时递归溢出
+    # Rouge库的LCS算法使用递归，对于过长文本会导致RecursionError
+    MAX_WORDS = 500
+    pred_words = pred.lower().split()
+    target_words = target.lower().split()
+
+    if len(pred_words) > MAX_WORDS:
+        pred = ' '.join(pred_words[:MAX_WORDS])
+    else:
+        pred = pred.lower()
+
+    if len(target_words) > MAX_WORDS:
+        target = ' '.join(target_words[:MAX_WORDS])
+    else:
+        target = target.lower()
+
     rouge_scorer = Rouge()
-    rouge_scores = rouge_scorer.get_scores(pred.lower(), target.lower())
+    rouge_scores = rouge_scorer.get_scores(pred, target)
     return rouge_scores
 
 
@@ -210,19 +236,19 @@ def judge_open_end_vqa(answer,response):
 def calculate_f1(prediction, ground_truth):
     prediction_tokens = set(prediction.lower().split())
     ground_truth_tokens = set(ground_truth.lower().split())
-    
+
     common = prediction_tokens & ground_truth_tokens
-    
+
     if len(prediction_tokens) == 0 or len(ground_truth_tokens) == 0:
-        return 0
-    
+        return 0, 0, 0
+
     precision = len(common) / len(prediction_tokens)
     recall = len(common) / len(ground_truth_tokens)
-    
+
     if precision + recall == 0:
         return 0,0,0
     f1 = 2 * (precision * recall) / (precision + recall)
-    
+
     return f1,precision,recall
 
 

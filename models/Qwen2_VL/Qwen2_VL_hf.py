@@ -67,4 +67,5 @@ class Qwen2VL:
         for messages in messages_list:
             result = self.generate_output(messages)
             res.append(result)
+            torch.cuda.empty_cache()  # 清理显存，防止OOM
         return res
