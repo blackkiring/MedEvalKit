@@ -64,6 +64,11 @@ def main():
     parser.add_argument('--api_key', type=str,default = "None")
     parser.add_argument('--base_url', type=str, default= "None")
 
+    # Tool calling support
+    parser.add_argument('--enable_tools', type=str, default="False",
+                        help='Enable tool calling support via ToolEvaluator (default: False)')
+    parser.add_argument('--max_tool_calls', type=int, default=5,
+                        help='Maximum number of tool calls per inference (default: 5)')
 
     args = parser.parse_args()
 
@@ -107,6 +112,43 @@ def main():
 
     print('initializing LLM...')
     model = init_llm(args)
+    
+    # Wrap model with ToolEvaluator if tool calling is enabled
+    if args.enable_tools == "True":
+        print('Enabling tool calling support...')
+        from utils.tool_evaluator import ToolEvaluator
+        
+        # Define default medical tools
+        def calculate_bmi(weight_kg: float, height_m: float) -> dict:
+            """Calculate BMI and provide interpretation."""
+            bmi = weight_kg / (height_m ** 2)
+            if bmi < 18.5:
+                category = "Underweight"
+            elif bmi < 25:
+                category = "Normal weight"
+            elif bmi < 30:
+                category = "Overweight"
+            else:
+                category = "Obese"
+            return {"bmi": round(bmi, 2), "category": category}
+        
+        def calculate_drug_dose(weight_kg: float, drug_name: str, mg_per_kg: float) -> dict:
+            """Calculate drug dosage based on weight."""
+            dose_mg = weight_kg * mg_per_kg
+            return {"drug": drug_name, "dose_mg": round(dose_mg, 2), "weight_kg": weight_kg}
+        
+        # Register default tools
+        tools = {
+            "calculate_bmi": calculate_bmi,
+            "calculate_drug_dose": calculate_drug_dose,
+        }
+        
+        model = ToolEvaluator(
+            model=model,
+            tools=tools,
+            max_tool_calls=args.max_tool_calls
+        )
+        print(f'Tool calling enabled with tools: {list(tools.keys())}')
     
     total_results_path = os.path.join(args.output_path,'total_results.json')
 

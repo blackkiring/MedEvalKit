@@ -47,6 +47,7 @@ We welcome contributions of new models, benchmarks, or enhanced evaluation metri
 
 
 ## 🔥 Latest News
+* **2026-02-04** - Added tool-based evaluation support via `ToolEvaluator`! 🔧
 * **2025-06-12** - Initial release of MedEvalKit v1.0!
 ---
 
@@ -217,6 +218,71 @@ python eval.py \
 chmod +x eval.sh  # Add execute permission
 ./eval.sh
 ```
+
+---
+
+## 🔧 Tool Calling Support
+
+MedEvalKit now supports tool-based evaluation, allowing models to invoke external tools (calculators, databases, APIs) during inference for more complex medical evaluations.
+
+### Enable Tool Calling
+
+Add these parameters to your eval script:
+
+```bash
+# Enable tool calling support
+ENABLE_TOOLS="True"
+MAX_TOOL_CALLS=5  # Maximum tool calls per inference
+
+python eval.py \
+    # ... other parameters ...
+    --enable_tools "$ENABLE_TOOLS" \
+    --max_tool_calls "$MAX_TOOL_CALLS"
+```
+
+### Built-in Tools
+
+The following medical tools are available by default:
+- **calculate_bmi**: Calculate Body Mass Index and categorize
+- **calculate_drug_dose**: Calculate drug dosage based on weight
+
+### Custom Tools
+
+See `examples/tool_evaluator_demo.py` for examples of:
+- Registering custom tools
+- Tool call protocol (XML-formatted requests)
+- Medical agent workflows
+
+### Tool Call Protocol
+
+Models request tools using XML format:
+```xml
+<tool_call>
+{
+    "name": "calculate_bmi",
+    "arguments": {
+        "weight_kg": 70,
+        "height_m": 1.75
+    }
+}
+</tool_call>
+```
+
+Results are formatted as:
+```xml
+<tool_result>
+Tool: calculate_bmi
+Result: {"bmi": 22.86, "category": "Normal weight"}
+</tool_result>
+```
+
+### Example Files
+
+- `examples/tool_evaluator_demo.py` - Basic tool calling demo
+- `examples/medical_agent.py` - Medical agent prompts and workflows
+- `examples/projection.py` - Action extraction utilities
+
+For more details, see the tool_evaluator implementation in `utils/tool_evaluator.py`.
 
 ---
 
