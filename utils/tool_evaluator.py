@@ -799,6 +799,30 @@ class ToolEvaluator:
         """
         return self.model.process_messages(messages)
     
+    def _ensure_chat_history(self, messages: Dict[str, Any]) -> bool:
+        """
+        Helper to detect if messages use chat-style history format.
+        
+        Chat-style history is indicated by having a "messages" key with a list
+        of message objects containing "role" and "content" fields.
+        
+        Args:
+            messages: Input messages dictionary
+            
+        Returns:
+            True if messages uses chat-style history, False otherwise
+        """
+        if "messages" not in messages:
+            return False
+        
+        msg_list = messages.get("messages")
+        if not isinstance(msg_list, list) or len(msg_list) == 0:
+            return False
+        
+        # Check if first message has expected structure
+        first_msg = msg_list[0]
+        return isinstance(first_msg, dict) and "role" in first_msg and "content" in first_msg
+    
     def generate_output(self, messages: Dict[str, Any]) -> str:
         """
         Generate output with tool calling support.
@@ -820,9 +844,22 @@ class ToolEvaluator:
         self.tool_call_history = []
         current_messages = messages.copy()
         
-        # Inject medical system prompt if medical tools are configured and no system prompt exists
-        if self.medical_tools_config and "system" not in current_messages:
-            current_messages["system"] = MEDICAL_AGENT_SYSTEM_PROMPT
+        # Detect if using chat-style history
+        use_chat_history = self._ensure_chat_history(current_messages)
+        
+        # Inject medical system prompt if medical tools are configured
+        if self.medical_tools_config:
+            if use_chat_history:
+                # For chat history, inject as first system message if not present
+                msg_list = current_messages.get("messages", [])
+                if not msg_list or msg_list[0].get("role") != "system":
+                    current_messages["messages"] = [
+                        {"role": "system", "content": MEDICAL_AGENT_SYSTEM_PROMPT}
+                    ] + msg_list
+            else:
+                # For prompt-based, inject system key if not present
+                if "system" not in current_messages:
+                    current_messages["system"] = MEDICAL_AGENT_SYSTEM_PROMPT
         
         # Tool calling is disabled if tool_choice is "none" or no tools registered
         if self.tool_choice == "none" or not self.tools:
@@ -857,12 +894,26 @@ class ToolEvaluator:
                 # Format result and append to context
                 tool_result_str = self._format_tool_result(tool_name, result)
                 
-                # Initialize 'prompt' key if missing (without re-copying messages)
-                if "prompt" not in current_messages:
-                    current_messages["prompt"] = f"\nPrevious response: {response}\n"
-                
-                # Append tool result to prompt
-                current_messages["prompt"] += tool_result_str
+                # Append results based on message format
+                if use_chat_history:
+                    # For chat history: append model response as assistant message
+                    # and tool feedback as user message
+                    current_messages["messages"].append({
+                        "role": "assistant",
+                        "content": response
+                    })
+                    current_messages["messages"].append({
+                        "role": "user",
+                        "content": tool_result_str
+                    })
+                else:
+                    # For prompt-based: append to prompt string (existing behavior)
+                    # Initialize 'prompt' key if missing (without re-copying messages)
+                    if "prompt" not in current_messages:
+                        current_messages["prompt"] = f"\nPrevious response: {response}\n"
+                    
+                    # Append tool result to prompt
+                    current_messages["prompt"] += tool_result_str
                 
             except Exception as e:
                 # If tool execution fails, return error in response
