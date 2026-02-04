@@ -17,14 +17,16 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 # Import directly to avoid dependency issues in demo
 import importlib.util
 
-# Load BaseLLM
-spec = importlib.util.spec_from_file_location("base_llm", "../models/base_llm.py")
+# Load BaseLLM using robust path resolution
+base_llm_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "models", "base_llm.py")
+spec = importlib.util.spec_from_file_location("base_llm", base_llm_path)
 base_llm_module = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(base_llm_module)
 BaseLLM = base_llm_module.BaseLLM
 
-# Load ToolEvaluator
-spec = importlib.util.spec_from_file_location("tool_evaluator", "../utils/tool_evaluator.py")
+# Load ToolEvaluator using robust path resolution
+tool_eval_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "utils", "tool_evaluator.py")
+spec = importlib.util.spec_from_file_location("tool_evaluator", tool_eval_path)
 tool_eval_module = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(tool_eval_module)
 ToolEvaluator = tool_eval_module.ToolEvaluator
@@ -299,7 +301,7 @@ def main():
     def calculate_age(birth_year: int, current_year: int = None) -> int:
         """Calculate age from birth year (defaults to current year)."""
         if current_year is None:
-            current_year = datetime.datetime.now().year
+            current_year = datetime.date.today().year
         return current_year - birth_year
     
     evaluator.register_tool("calculate_age", calculate_age)

@@ -56,6 +56,7 @@ def medical_agent_projection(actions: List[str]):
         if think_start_idx != -1 and think_end_idx != -1:
             valids[i] = 1
 
+        # Mark actions with Chinese characters as invalid since the system expects English-only output
         if re.search(r"[\u4e00-\u9fff]", original_str):
             valids[i] = 0
 

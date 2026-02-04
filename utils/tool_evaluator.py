@@ -226,16 +226,13 @@ class ToolEvaluator:
                 # Format result and append to context
                 tool_result_str = self._format_tool_result(tool_name, result)
                 
-                # Update messages with tool result
-                if "prompt" in current_messages:
-                    current_messages["prompt"] += tool_result_str
-                else:
-                    # Handle different message formats
+                # Ensure 'prompt' key exists in messages
+                if "prompt" not in current_messages:
                     current_messages = messages.copy()
-                    if "prompt" not in current_messages:
-                        current_messages["prompt"] = ""
-                    current_messages["prompt"] += f"\nPrevious response: {response}\n"
-                    current_messages["prompt"] += tool_result_str
+                    current_messages["prompt"] = f"\nPrevious response: {response}\n"
+                
+                # Append tool result to prompt
+                current_messages["prompt"] += tool_result_str
                 
             except Exception as e:
                 # If tool execution fails, return error in response
