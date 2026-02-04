@@ -10,8 +10,9 @@ class Qwen3_VL:
         self.llm = LLM(
             model=model_path,
             tensor_parallel_size=int(os.environ.get("tensor_parallel_size", 1)),
-            enforce_eager=True,
+            enforce_eager=False,
             trust_remote_code=True,
+            max_model_len=100000,
             limit_mm_per_prompt={"image": args.max_image_num},
         )
         self.processor = AutoProcessor.from_pretrained(model_path)
@@ -19,7 +20,7 @@ class Qwen3_VL:
         self.sampling_params = SamplingParams(
             temperature=args.temperature,
             top_p=args.top_p,
-            repetition_penalty=args.repetition_penalty,
+            frequency_penalty=args.repetition_penalty,
             max_tokens=args.max_new_tokens,
             stop_token_ids=[],
         )
@@ -31,8 +32,8 @@ class Qwen3_VL:
         current_messages = []
 
         if "messages" in messages:
-            messages = messages["messages"]
-            for message in messages:
+            raw_messages = messages["messages"]
+            for message in raw_messages:
                 role = message["role"]
                 content = message["content"]
                 # If content is already a list (multimodal content items), pass through directly
