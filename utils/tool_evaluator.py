@@ -770,6 +770,8 @@ class ToolEvaluator:
         """
         # Check if this is a medical tool result
         is_medical_tool = tool_name in ["SAM2", "BiomedParse", "Zoom-in"]
+        # Medical tool results contain image metadata; 'path' is required for internal use
+        # but only index, width, height are shown in the feedback message
         is_medical_result = isinstance(result, dict) and all(
             k in result for k in ["index", "path", "width", "height"]
         )
