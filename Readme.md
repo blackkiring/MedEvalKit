@@ -47,7 +47,7 @@ We welcome contributions of new models, benchmarks, or enhanced evaluation metri
 
 
 ## 🔥 Latest News
-* **2026-02-04** - Added tool-based evaluation support via `ToolEvaluator`! 🔧
+* **2026-02-04** - Added medical image processing tools (SAM2, BiomedParse, Zoom-in) to `ToolEvaluator`! 🔧🩺
 * **2025-06-12** - Initial release of MedEvalKit v1.0!
 ---
 
@@ -223,7 +223,7 @@ chmod +x eval.sh  # Add execute permission
 
 ## 🔧 Tool Calling Support
 
-MedEvalKit now supports tool-based evaluation, allowing models to invoke external tools (calculators, databases, APIs) during inference for more complex medical evaluations.
+MedEvalKit now supports tool-based evaluation, allowing models to invoke external tools (calculators, databases, APIs, medical image processing) during inference for more complex medical evaluations.
 
 ### Enable Tool Calling
 
@@ -242,9 +242,37 @@ python eval.py \
 
 ### Built-in Tools
 
-The following medical tools are available by default:
+The following tools are available:
+
+**Basic Medical Tools:**
 - **calculate_bmi**: Calculate Body Mass Index and categorize
 - **calculate_drug_dose**: Calculate drug dosage based on weight
+- **get_vital_signs_reference**: Get reference ranges for vital signs
+
+**Medical Image Processing Tools:**
+- **SAM2**: Segment Anything Model 2 for bounding box-based segmentation
+- **BiomedParse**: Text-based medical image segmentation
+- **Zoom-in**: Region cropping for detailed inspection
+
+### Medical Image Processing Setup
+
+To use medical image processing tools, configure the ToolEvaluator with server URLs:
+
+```python
+from utils.tool_evaluator import ToolEvaluator
+
+medical_config = {
+    "tool_server_url": "http://localhost:6060",  # SAM2 server
+    "biomedparse_url": "http://localhost:6061",  # BiomedParse server
+    "output_dir": "./medical_outputs"
+}
+
+evaluator = ToolEvaluator(
+    model=model,
+    tools={},
+    medical_tools_config=medical_config
+)
+```
 
 ### Custom Tools
 
@@ -255,7 +283,9 @@ See `examples/tool_evaluator_demo.py` for examples of:
 
 ### Tool Call Protocol
 
-Models request tools using XML format:
+Models request tools using two supported formats:
+
+**Standard Format:**
 ```xml
 <tool_call>
 {
@@ -265,6 +295,19 @@ Models request tools using XML format:
         "height_m": 1.75
     }
 }
+</tool_call>
+```
+
+**Medical Tools Format (with JSON blocks):**
+```xml
+<tool_call>
+SAM2
+```json
+{
+    "index": 1,
+    "bbox_2d": [100, 100, 900, 900]
+}
+```
 </tool_call>
 ```
 
@@ -279,6 +322,7 @@ Result: {"bmi": 22.86, "category": "Normal weight"}
 ### Example Files
 
 - `examples/tool_evaluator_demo.py` - Basic tool calling demo
+- `examples/medical_tools_demo.py` - Medical image processing tools demo
 - `examples/medical_agent.py` - Medical agent prompts and workflows
 - `examples/projection.py` - Action extraction utilities
 
