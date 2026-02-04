@@ -98,7 +98,7 @@ def process_single_sample(data):
         img_key = f'image_{i}'
         if img_key in data and data[img_key] is not None:
             images.append(data[img_key])
-    
+
     if len(o_imgs_paths) > 1:  # multiple images in options, used for random selection
         return {'id': data['id'], 'question': question, 'options': data['options'], 'answer': data['answer'],
              'images': images, 'question_type': data['question_type']}
