@@ -154,18 +154,20 @@ def construct_prompt(sample):
         image_index_info = "The index of the given image is 1.\n"
     else:
         indices = ", ".join(str(i) for i in range(1, num_images + 1))
-        image_index_info = f"The index of the given images are {indices}.\n"
+        image_index_info = f"The indices of the given images are {indices}.\n"
     
     example = ""
     if sample['question_type'] == 'multiple-choice':
         start_chr = 'A'
         prediction_range = []
         index2ans = {}
+        options_list = []
         for option in options:
             prediction_range.append(start_chr)
-            example += f"({start_chr}) {option} "
+            options_list.append(f"({start_chr}) {option}")
             index2ans[start_chr] = option
             start_chr = chr(ord(start_chr) + 1)
+        example = " ".join(options_list)
         
         # Construct prompt with new format
         empty_prompt = f"### Question:\n{question}\nOptions: {example}\n{image_index_info}"
