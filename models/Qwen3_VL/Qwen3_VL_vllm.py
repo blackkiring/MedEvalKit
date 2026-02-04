@@ -35,7 +35,12 @@ class Qwen3_VL:
             for message in messages:
                 role = message["role"]
                 content = message["content"]
-                current_messages.append({"role": role, "content": [{"type": "text", "text": content}]})
+                # If content is already a list (multimodal content items), pass through directly
+                if isinstance(content, list):
+                    current_messages.append({"role": role, "content": content})
+                else:
+                    # Otherwise, wrap string content as a text content item
+                    current_messages.append({"role": role, "content": [{"type": "text", "text": content}]})
 
         else:
             prompt = messages["prompt"]
