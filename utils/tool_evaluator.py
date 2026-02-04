@@ -12,6 +12,7 @@ parsers. Direct use of eval() can execute arbitrary code and poses security risk
 import json
 import os
 import re
+import sys
 import uuid
 import io
 import shutil
@@ -25,7 +26,6 @@ from models.base_llm import BaseLLM
 # Import medical system prompts
 try:
     # Try relative import from examples directory
-    import sys
     examples_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'examples')
     if examples_path not in sys.path:
         sys.path.insert(0, examples_path)
