@@ -48,8 +48,8 @@ def medical_agent_projection(actions: List[str]):
         action_lower = original_str.lower()
 
         extracted_action = _extract_tool_or_answer(original_str)
-        cleaned_action = original_str.strip()
-        processed_actions[i] = cleaned_action if cleaned_action else extracted_action
+        # Use stripped original string if non-empty, otherwise use extracted action
+        processed_actions[i] = original_str.strip() or extracted_action
 
         think_start_idx = action_lower.find("<think>")
         think_end_idx = action_lower.find("</think>")
