@@ -92,12 +92,19 @@ def process_single_sample(data):
         for img_path in current_o_imgs_paths:
             o_imgs_paths.append(img_path)
 
+    # Collect all images from the dataset (image_1 through image_7)
+    images = []
+    for i in range(1, 8):
+        img_key = f'image_{i}'
+        if img_key in data and data[img_key] is not None:
+            images.append(data[img_key])
+
     if len(o_imgs_paths) > 1:  # multiple images in options, used for random selection
         return {'id': data['id'], 'question': question, 'options': data['options'], 'answer': data['answer'],
-             'image': None, 'question_type': data['question_type']}
+             'images': images, 'question_type': data['question_type']}
     else:
         return {'id': data['id'], 'question': question, 'options': data['options'], 'answer': data['answer'],
-             'image': data['image_1'], 'question_type': data['question_type']}
+             'images': images, 'question_type': data['question_type']}
 
 
 # DATA SAVING
@@ -136,23 +143,34 @@ def save_args(args, path_dir):
 def construct_prompt(sample):
     question = sample['question']
     options = eval(sample['options'])
+    
+    # Get number of images if available
+    num_images = len(sample.get('images', []))
+    
+    # Construct image index information
+    if num_images == 0:
+        image_index_info = ""
+    elif num_images == 1:
+        image_index_info = "The index of the given image is 1.\n"
+    else:
+        indices = ", ".join(str(i) for i in range(1, num_images + 1))
+        image_index_info = f"The indices of the given images are {indices}.\n"
+    
     example = ""
     if sample['question_type'] == 'multiple-choice':
         start_chr = 'A'
         prediction_range = []
         index2ans = {}
+        options_list = []
         for option in options:
             prediction_range.append(start_chr)
-            example += f"({start_chr}) {option}\n"
+            options_list.append(f"({start_chr}) {option}")
             index2ans[start_chr] = option
             start_chr = chr(ord(start_chr) + 1)
-        empty_prompt_sample_structure = """
-{}
-
-{}
-
-        """
-        empty_prompt = empty_prompt_sample_structure.format(question, example)
+        example = " ".join(options_list)
+        
+        # Construct prompt with new format
+        empty_prompt = f"### Question:\n{question}\nOptions: {example}\n{image_index_info}"
 
         if os.environ["REASONING"] == "True":
             empty_prompt += 'Answer with the option\'s letter from the given choices and put the letter in one "\\boxed{}".'
@@ -168,11 +186,8 @@ def construct_prompt(sample):
 
         res_dict['gt_content'] = options[ord(sample['answer'].upper()) - ord('A')]
     else:
-        empty_prompt_sample_structure = """
-{}
-
-        """
-        empty_prompt = empty_prompt_sample_structure.format(question)
+        # Construct prompt with new format for open questions
+        empty_prompt = f"### Question:\n{question}\n{image_index_info}"
 
         if os.environ["REASONING"] == "True":
             empty_prompt += 'Answer the question using a single word or phrase and put the answer in one "\\boxed{}".'
