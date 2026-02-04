@@ -221,3 +221,7 @@ eval_results/
 *.tgz
 *.zip
 
+# Medical tool outputs
+medical_demo_outputs/
+medical_tool_outputs/
+
