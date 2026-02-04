@@ -295,7 +295,11 @@ def main():
     print(f"   Current tools: {evaluator.list_tools()}")
     
     # Add a new tool
-    def calculate_age(birth_year: int, current_year: int = 2024) -> int:
+    import datetime
+    def calculate_age(birth_year: int, current_year: int = None) -> int:
+        """Calculate age from birth year (defaults to current year)."""
+        if current_year is None:
+            current_year = datetime.datetime.now().year
         return current_year - birth_year
     
     evaluator.register_tool("calculate_age", calculate_age)

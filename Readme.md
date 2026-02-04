@@ -47,6 +47,7 @@ We welcome contributions of new models, benchmarks, or enhanced evaluation metri
 
 
 ## 🔥 Latest News
+* **2026-02-04** - Added tool-based evaluation support via `ToolEvaluator` class! 🔧
 * **2025-06-12** - Initial release of MedEvalKit v1.0!
 ---
 
@@ -216,6 +217,54 @@ python eval.py \
 ```bash
 chmod +x eval.sh  # Add execute permission
 ./eval.sh
+```
+
+---
+
+## 🔧 Tool-Based Evaluation (New Feature!)
+
+MedEvalKit now supports **tool-based evaluation** through the `ToolEvaluator` class, allowing models to interact with external tools during inference.
+
+### Key Features
+- 🛠️ **Dynamic Tool Registration**: Add/remove tools at runtime
+- 🔄 **Automatic Tool Calling**: Models can request tool execution seamlessly
+- 📊 **Tool Call History**: Track all tool interactions for analysis
+- 🎯 **Flexible Configuration**: Control tool selection and execution limits
+- ✅ **Backward Compatible**: Works with all existing models
+
+### Quick Example
+```python
+from LLMs import init_llm
+from utils.tool_evaluator import ToolEvaluator
+
+# Initialize model
+model = init_llm(args)
+
+# Define medical tools
+def calculate_bmi(weight_kg: float, height_m: float) -> dict:
+    bmi = weight_kg / (height_m ** 2)
+    return {"bmi": round(bmi, 2)}
+
+# Wrap model with ToolEvaluator
+evaluator = ToolEvaluator(
+    model=model,
+    tools={"calculate_bmi": calculate_bmi},
+    max_tool_calls=5
+)
+
+# Use in evaluation
+messages = {"prompt": "Calculate BMI for 70kg, 1.75m patient"}
+response = evaluator.generate_output(messages)
+```
+
+### Documentation & Examples
+- 📖 **Full Guide**: [docs/tool_evaluator_guide.md](docs/tool_evaluator_guide.md)
+- 🎮 **Demo Script**: [examples/tool_evaluator_demo.py](examples/tool_evaluator_demo.py)
+- 🧪 **Unit Tests**: [utils/test_tool_evaluator.py](utils/test_tool_evaluator.py)
+
+### Run the Demo
+```bash
+python examples/tool_evaluator_demo.py
 ```
 
 ---

@@ -3,6 +3,10 @@ ToolEvaluator: A wrapper class for evaluating models with tool-based calls.
 
 This module extends the MedEvalKit framework to support tool-based evaluation,
 allowing models to interact with external tools during inference.
+
+SECURITY WARNING: When implementing tools that evaluate expressions or execute
+code, use safe alternatives to eval() such as ast.literal_eval() or dedicated
+parsers. Direct use of eval() can execute arbitrary code and poses security risks.
 """
 
 import json
@@ -25,8 +29,15 @@ class ToolEvaluator:
     
     Example:
         >>> model = init_llm(args)
+        >>> # SECURITY NOTE: Use safe math parsers instead of eval() in production
+        >>> # Example shown for demonstration only
+        >>> def safe_calculate(expression: str) -> float:
+        ...     # Use a proper math parser library like py_expression_eval
+        ...     # or ast.literal_eval for safe evaluation
+        ...     import ast
+        ...     return ast.literal_eval(expression)
         >>> tools = {
-        ...     "calculate": lambda x: eval(x),
+        ...     "calculate": safe_calculate,
         ...     "search": lambda q: search_database(q)
         ... }
         >>> tool_evaluator = ToolEvaluator(model, tools=tools)

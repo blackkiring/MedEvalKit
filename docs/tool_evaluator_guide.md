@@ -40,9 +40,24 @@ evaluator = ToolEvaluator(model)
 
 ```python
 # Define tool functions
-def calculate(expression: str) -> float:
-    """Evaluate a mathematical expression."""
-    return eval(expression)
+def safe_calculate(expression: str) -> float:
+    """
+    Safely evaluate a mathematical expression.
+    
+    SECURITY NOTE: Never use eval() directly in production as it can execute
+    arbitrary code. Use a dedicated math parser library instead.
+    """
+    # For production use, consider libraries like:
+    # - py_expression_eval
+    # - simpleeval
+    # - numexpr
+    # For simple cases, ast.literal_eval can parse literals safely
+    import ast
+    try:
+        # Only works for literal expressions
+        return ast.literal_eval(expression)
+    except (ValueError, SyntaxError):
+        raise ValueError(f"Invalid expression: {expression}")
 
 def search_database(query: str) -> dict:
     """Search medical database for information."""
@@ -50,9 +65,11 @@ def search_database(query: str) -> dict:
     return {"result": "Medical information..."}
 
 # Register tools
-evaluator.register_tool("calculate", calculate)
+evaluator.register_tool("calculate", safe_calculate)
 evaluator.register_tool("search", search_database)
 ```
+
+> **⚠️ Security Warning**: When implementing tools that evaluate expressions or execute code, always use safe alternatives to `eval()`. Direct use of `eval()` can execute arbitrary Python code and poses serious security risks.
 
 ### 3. Use in Evaluation
 
@@ -327,14 +344,88 @@ Tool execution errors are caught and returned in the response:
 
 This allows the model to see and potentially handle errors gracefully.
 
+## Security Considerations
+
+### Code Execution
+**Never use `eval()` or `exec()` in production tools.** These functions can execute arbitrary Python code and create severe security vulnerabilities:
+
+```python
+# ❌ DANGEROUS - Do not use in production
+def bad_calculator(expression: str):
+    return eval(expression)  # Can execute ANY Python code!
+
+# ✅ SAFE - Use dedicated parsers
+def safe_calculator(expression: str):
+    from simpleeval import simple_eval
+    return simple_eval(expression, names={})
+```
+
+### Input Validation
+Always validate and sanitize tool inputs:
+
+```python
+def calculate_bmi(weight_kg: float, height_m: float) -> dict:
+    # Validate inputs
+    if not isinstance(weight_kg, (int, float)) or weight_kg <= 0:
+        raise ValueError("Weight must be a positive number")
+    if not isinstance(height_m, (int, float)) or height_m <= 0:
+        raise ValueError("Height must be a positive number")
+    
+    bmi = weight_kg / (height_m ** 2)
+    return {"bmi": round(bmi, 2)}
+```
+
+### Resource Limits
+Set limits to prevent resource exhaustion:
+
+```python
+# Limit tool call iterations
+evaluator = ToolEvaluator(model, tools=tools, max_tool_calls=10)
+
+# Implement timeouts in tools
+import signal
+
+def timeout_handler(signum, frame):
+    raise TimeoutError("Tool execution timed out")
+
+def safe_tool_with_timeout(arg):
+    signal.signal(signal.SIGALRM, timeout_handler)
+    signal.alarm(5)  # 5 second timeout
+    try:
+        result = expensive_operation(arg)
+    finally:
+        signal.alarm(0)  # Cancel alarm
+    return result
+```
+
+### Data Access Control
+Restrict tool access to sensitive data:
+
+```python
+def search_database(query: str) -> dict:
+    # Sanitize query to prevent SQL injection
+    from sqlalchemy import text
+    
+    # Use parameterized queries
+    result = db.execute(
+        text("SELECT * FROM medical_records WHERE condition = :query"),
+        {"query": query}
+    )
+    return result.fetchone()
+```
+
 ## Best Practices
 
-1. **Keep Tools Simple**: Each tool should have a single, well-defined purpose
-2. **Handle Errors**: Implement error handling within your tool functions
-3. **Document Tools**: Use docstrings to describe tool behavior
-4. **Set Reasonable Limits**: Use `max_tool_calls` to prevent infinite loops
-5. **Validate Arguments**: Validate tool arguments before execution
-6. **Test Tools**: Test tools independently before using in evaluation
+1. **Security First**: NEVER use `eval()` or `exec()` in production tools. Use safe alternatives:
+   - For math: Use libraries like `simpleeval`, `py_expression_eval`, or `numexpr`
+   - For literals: Use `ast.literal_eval()`
+   - For structured data: Use proper JSON/XML parsers
+2. **Keep Tools Simple**: Each tool should have a single, well-defined purpose
+3. **Handle Errors**: Implement error handling within your tool functions
+4. **Document Tools**: Use docstrings to describe tool behavior
+5. **Set Reasonable Limits**: Use `max_tool_calls` to prevent infinite loops
+6. **Validate Arguments**: Validate and sanitize tool arguments before execution
+7. **Test Tools**: Test tools independently before using in evaluation
 
 ## Limitations
 
