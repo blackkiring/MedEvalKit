@@ -758,6 +758,9 @@ class ToolEvaluator:
         """
         Format tool execution result for model input.
         
+        For medical tools (SAM2, BiomedParse, Zoom-in), uses the medical agent
+        feedback format with image metadata. For other tools, uses generic format.
+        
         Args:
             tool_name: Name of the tool that was executed
             result: Result from tool execution
@@ -765,7 +768,22 @@ class ToolEvaluator:
         Returns:
             Formatted string to append to model context
         """
-        return f"\n<tool_result>\nTool: {tool_name}\nResult: {json.dumps(result, default=str)}\n</tool_result>\n"
+        # Check if this is a medical tool result
+        is_medical_tool = tool_name in ["SAM2", "BiomedParse", "Zoom-in"]
+        is_medical_result = isinstance(result, dict) and all(
+            k in result for k in ["index", "path", "width", "height"]
+        )
+        
+        if is_medical_tool and is_medical_result:
+            # Use medical agent tool feedback format
+            return MEDICAL_AGENT_TOOL_FEEDBACK.format(
+                image_index=result["index"],
+                width=result["width"],
+                height=result["height"]
+            )
+        else:
+            # Use generic tool result format for non-medical tools
+            return f"\n<tool_result>\nTool: {tool_name}\nResult: {json.dumps(result, default=str)}\n</tool_result>\n"
     
     def process_messages(self, messages: Dict[str, Any]) -> Any:
         """
