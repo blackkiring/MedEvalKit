@@ -20,7 +20,7 @@ def run_model(samples, model,):
         current_messages = []
         current_samples = []
         for sample in tqdm(samples):
-            messages = {"prompt":sample["final_input_prompt"],"image":sample["image"]}
+            messages = {"prompt":sample["final_input_prompt"],"images":sample["images"]}
             current_messages.append(messages)
             current_samples.append(sample)
             if len(current_messages) >= 2000:

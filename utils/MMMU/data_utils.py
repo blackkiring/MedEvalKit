@@ -92,12 +92,19 @@ def process_single_sample(data):
         for img_path in current_o_imgs_paths:
             o_imgs_paths.append(img_path)
 
+    # Collect all images from the dataset (image_1 through image_7)
+    images = []
+    for i in range(1, 8):
+        img_key = f'image_{i}'
+        if img_key in data and data[img_key] is not None:
+            images.append(data[img_key])
+    
     if len(o_imgs_paths) > 1:  # multiple images in options, used for random selection
         return {'id': data['id'], 'question': question, 'options': data['options'], 'answer': data['answer'],
-             'image': None, 'question_type': data['question_type']}
+             'images': images, 'question_type': data['question_type']}
     else:
         return {'id': data['id'], 'question': question, 'options': data['options'], 'answer': data['answer'],
-             'image': data['image_1'], 'question_type': data['question_type']}
+             'images': images, 'question_type': data['question_type']}
 
 
 # DATA SAVING
