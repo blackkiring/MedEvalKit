@@ -143,6 +143,19 @@ def save_args(args, path_dir):
 def construct_prompt(sample):
     question = sample['question']
     options = eval(sample['options'])
+    
+    # Get number of images if available
+    num_images = len(sample.get('images', []))
+    
+    # Construct image index information
+    if num_images == 0:
+        image_index_info = ""
+    elif num_images == 1:
+        image_index_info = "The index of the given image is 1.\n"
+    else:
+        indices = ", ".join(str(i) for i in range(1, num_images + 1))
+        image_index_info = f"The index of the given images are {indices}.\n"
+    
     example = ""
     if sample['question_type'] == 'multiple-choice':
         start_chr = 'A'
@@ -150,16 +163,12 @@ def construct_prompt(sample):
         index2ans = {}
         for option in options:
             prediction_range.append(start_chr)
-            example += f"({start_chr}) {option}\n"
+            example += f"({start_chr}) {option} "
             index2ans[start_chr] = option
             start_chr = chr(ord(start_chr) + 1)
-        empty_prompt_sample_structure = """
-{}
-
-{}
-
-        """
-        empty_prompt = empty_prompt_sample_structure.format(question, example)
+        
+        # Construct prompt with new format
+        empty_prompt = f"### Question:\n{question}\nOptions: {example}\n{image_index_info}"
 
         if os.environ["REASONING"] == "True":
             empty_prompt += 'Answer with the option\'s letter from the given choices and put the letter in one "\\boxed{}".'
@@ -175,11 +184,8 @@ def construct_prompt(sample):
 
         res_dict['gt_content'] = options[ord(sample['answer'].upper()) - ord('A')]
     else:
-        empty_prompt_sample_structure = """
-{}
-
-        """
-        empty_prompt = empty_prompt_sample_structure.format(question)
+        # Construct prompt with new format for open questions
+        empty_prompt = f"### Question:\n{question}\n{image_index_info}"
 
         if os.environ["REASONING"] == "True":
             empty_prompt += 'Answer the question using a single word or phrase and put the answer in one "\\boxed{}".'
