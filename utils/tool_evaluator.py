@@ -12,6 +12,7 @@ parsers. Direct use of eval() can execute arbitrary code and poses security risk
 import json
 import os
 import re
+import sys
 import uuid
 import io
 import shutil
@@ -21,6 +22,118 @@ from pathlib import Path
 from PIL import Image
 from typing import Any, Dict, List, Optional, Callable, Tuple
 from models.base_llm import BaseLLM
+
+# Import medical system prompts
+try:
+    # Try relative import from examples directory
+    examples_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'examples')
+    if examples_path not in sys.path:
+        sys.path.insert(0, examples_path)
+    from medical_agent import (
+        MEDICAL_AGENT_TOOL_DESCRIPTION,
+        MEDICAL_AGENT_REQUIRED_FORMAT,
+        MEDICAL_AGENT_REASONING_TIPS,
+        MEDICAL_AGENT_SYSTEM_PROMPT,
+        MEDICAL_AGENT_USER_PROMPT,
+        MEDICAL_AGENT_TOOL_FEEDBACK
+    )
+except ImportError:
+    # Fallback: Define prompts inline if import fails
+    MEDICAL_AGENT_TOOL_DESCRIPTION = """### Available tools:
+You can use the following three tools to process the images. After each tool usage, you must wait for and analyze the visualization feedback before proceeding.
+
+1. **Zoom-in**
+- Purpose: Zoom in on a specific region of an image by cropping it to a bounding box for detailed inspection. If a mask is provided, the zoomed image will highlight the mask's contour.
+- Input format: JSON
+```json
+[
+    {
+        "index": i, # Image index
+        "bbox_2d": [x1, y1, x2, y2]
+    }
+]
+```
+- Output: Generates zoomed areas for visual inspection of the i-th image
+
+2. **BiomedParse**
+- Purpose: Detect and segment a specified object type in the image (e.g. lesion, tumor) using text descriptions for the targets.
+- Input format: JSON
+```json
+[
+    {
+        "index": i, # Image index
+        "captions": "target_description"
+    }
+]
+```
+- Output: Generates segmentation masks for target objects of the i-th image
+
+3. **SAM2**
+- Purpose: Detect and Segment an object in the image given a bounding box.
+- Input format: JSON
+```json
+[
+    {
+        "index": i, # Image index
+        "bbox_2d": [x1, y1, x2, y2]
+    }
+]
+```
+- Output: Generates segmentation masks for target objects of the i-th image
+"""
+
+    MEDICAL_AGENT_REQUIRED_FORMAT = """### Required Output Format:
+For each reasoning step, you must structure your response as follows:
+<think> [Your detailed reasoning process] </think> Action: [Zoom-in/BiomedParse/SAM2]
+```json
+[JSON format coordinates or descriptions]
+```
+
+After your reasoning and iteratively refine your solution through tool invocation feedback, you should arrive at a final answer and structure your response as follows:
+<think> [Your detailed reasoning process] </think> Action: Answer
+<answer> [Your final answer] </answer>
+"""
+
+    MEDICAL_AGENT_REASONING_TIPS = """### Please NOTE the following reasoning techniques:
+1. Initial Analysis
+   - Break down the complex problem
+   - Plan your approach
+
+2. Iterative Reasoning for Each Step
+   - Choose appropriate tool
+   - Provide absolute coordinates in JSON format (The top-left corner of the image is (0, 0) and the bottom-right corner is (512, 512))
+   - Observe the tool invocation output
+   - Reflect on the results returned by the tool:
+     * Does the results of the segmentation or zooming reasonable?
+     * Does it align with your reasoning?
+     * What adjustments are needed?
+   - Backtrack and Adjust:
+     * If errors found, backtrack to previous step to modify actions or decisions as needed.
+"""
+
+    MEDICAL_AGENT_SYSTEM_PROMPT = f"""### Guidance:
+You are a helpful assistant specialized in medical image analysis. You have access to several tools that help you segment and examine medical images (e.g. highlighting lesions or tumors) to answer questions.
+Your task is to carefully analyze the image and question, use the tools step-by-step, and provide a well-reasoned final answer through tool invocation feedback.
+
+{MEDICAL_AGENT_TOOL_DESCRIPTION}
+
+{MEDICAL_AGENT_REQUIRED_FORMAT}
+
+{MEDICAL_AGENT_REASONING_TIPS}
+"""
+
+    MEDICAL_AGENT_USER_PROMPT = """<image>
+### Question:
+{question}
+Options:
+{options}
+The index of the given image is {image_index} (width: {width}, height: {height}).
+Begin your reasoning. After each tool use, critically evaluate the image returned by the tool and adjust tool decisions if needed:
+"""
+
+    MEDICAL_AGENT_TOOL_FEEDBACK = """<image>
+The index of the given image is {image_index} (width: {width}, height: {height}). Continue your reasoning. After each tool use, critically evaluate the image returned by the tool and adjust tool decisions if needed:
+"""
 
 
 class MedicalToolClient:
@@ -72,6 +185,12 @@ class ToolEvaluator:
     extending the standard evaluation workflow to support more complex interactions.
     Supports both simple function tools and advanced medical image processing tools.
     
+    When medical tools are configured, ToolEvaluator automatically injects comprehensive
+    system prompts that include:
+    - Tool descriptions (SAM2, BiomedParse, Zoom-in)
+    - Required output format specifications
+    - Reasoning tips for iterative tool usage
+    
     Args:
         model: The base model instance (must inherit from BaseLLM)
         tools: Optional dictionary of tool functions that can be called
@@ -81,6 +200,12 @@ class ToolEvaluator:
             - tool_server_url: URL of the main tool server (for SAM2)
             - biomedparse_url: URL of the BiomedParse server
             - output_dir: Directory for saving processed images
+            
+    Note:
+        The medical system prompt is automatically injected into messages when:
+        1. medical_tools_config is provided
+        2. No "system" key exists in the input messages
+        This ensures models receive proper guidance without requiring manual prompt setup.
     
     Example:
         >>> model = init_llm(args)
@@ -90,7 +215,7 @@ class ToolEvaluator:
         ...     return ast.literal_eval(expression)
         >>> tools = {"calculate": safe_calculate}
         >>> 
-        >>> # With medical tools
+        >>> # With medical tools (system prompt automatically injected)
         >>> medical_config = {
         ...     "tool_server_url": "http://localhost:6060",
         ...     "biomedparse_url": "http://localhost:6061",
@@ -101,6 +226,7 @@ class ToolEvaluator:
         ...     tools=tools,
         ...     medical_tools_config=medical_config
         ... )
+        >>> # System prompt with tool descriptions is automatically added
         >>> result = tool_evaluator.generate_output(messages)
     """
     
@@ -661,6 +787,10 @@ class ToolEvaluator:
         tool calls. If the model requests a tool call, it executes the tool
         and feeds the result back to the model.
         
+        When medical tools are configured, this method automatically injects
+        the medical system prompt to provide tool usage guidance, output format
+        requirements, and reasoning tips to the model.
+        
         Args:
             messages: Input messages dictionary
             
@@ -669,6 +799,10 @@ class ToolEvaluator:
         """
         self.tool_call_history = []
         current_messages = messages.copy()
+        
+        # Inject medical system prompt if medical tools are configured and no system prompt exists
+        if self.medical_tools_config and "system" not in current_messages:
+            current_messages["system"] = MEDICAL_AGENT_SYSTEM_PROMPT
         
         # Tool calling is disabled if tool_choice is "none" or no tools registered
         if self.tool_choice == "none" or not self.tools:
