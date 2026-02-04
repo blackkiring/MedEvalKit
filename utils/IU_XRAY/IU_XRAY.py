@@ -52,7 +52,7 @@ class IU_XRAY(BaseDataset):
         findings = "None" if findings.strip() == "" else findings
         impression = "None" if impression.strip() == "" else impression
         
-        prompt = get_report_generation_promp()
+        prompt = get_report_generation_prompt()
 
         messages = {"prompt":prompt,"images":images}
         sample["messages"] = messages
@@ -106,9 +106,14 @@ class IU_XRAY(BaseDataset):
                 raise ValueError("Chunk inference is not support for download. Try to run eval.sh insteal of eval_chunked.sh")
 
             print("Start downloading the IU_XRAY dataset...")
+            os.makedirs(self.dataset_path, exist_ok=True)
             url="https://openi.nlm.nih.gov/imgs/collections/NLMCXR_png.tgz"
             self._download_file_local(local_path=self.dataset_path,url=url)
-            self._unzip_img_zip_local(local_path=self.dataset_path,zip_filename="images.zip")
+            self._unzip_img_zip_local(local_path=self.dataset_path,zip_filename="NLMCXR_png.tgz")
+            # Rename extracted folder to 'images' if needed
+            extracted_path = os.path.join(self.dataset_path, "NLMCXR_png")
+            if os.path.exists(extracted_path) and not os.path.exists(img_path):
+                os.rename(extracted_path, img_path)
             print("Download and extraction completed successfully")
 
                 

@@ -151,15 +151,24 @@ class SLAKE(BaseDataset):
 
         if os.environ.get("use_llm_judge","False") == "True":
             metrics["open"]["right"] = 0
+            metrics["close"]["right"] = 0
+            metrics["total metrics"]["right"] = 0
             llm = judger
             results = llm.generate_outputs(messages_list)
             i = 0
             for result,lang,answer_type in zip(results,langs,answer_types):
-                result = extract(result,"judge")
-                result = True if result == "0" else False
-                out_samples[i]["correct"] = result
+                out_samples[i]["llm_judge_response"] = result
+                if result is None:
+                    # LLM judge failed, keep original correct value
+                    out_samples[i]["llm_judge_success"] = False
+                    judge_result = out_samples[i]["correct"]
+                else:
+                    out_samples[i]["llm_judge_success"] = True
+                    judge_result = extract(result, "judge")
+                    judge_result = True if judge_result == "0" else False
+                out_samples[i]["correct"] = judge_result
                 i += 1
-                if result:
+                if judge_result:
                     if answer_type == "OPEN":
                         metrics["open"]["right"] += 1
                     else:

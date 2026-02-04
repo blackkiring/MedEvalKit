@@ -120,11 +120,12 @@ class OmniMedVQA(BaseDataset):
         for i,sample in enumerate(out_samples):
             response = sample["response"]
             response = extract(response,"answer")
-            
+
             choices = sample["choices"]
             answer = sample["answer"]
-            question_type = sample["question_type"]
-            modality_type = sample["modality_type"]
+            question_type = sample.get("question_type", "Unknown")
+            # Handle both "modality_type" and "modality" field names (data inconsistency)
+            modality_type = sample.get("modality_type", sample.get("modality", "Unknown"))
             total_question_type[question_type] += 1
             total_modality_type[modality_type] += 1
             total += 1
@@ -135,7 +136,7 @@ class OmniMedVQA(BaseDataset):
                 right_question_type[question_type] += 1
                 right_modality_type[modality_type] += 1
                 right += 1
-        
+
         metrics = {"total":total,"right":right,"acc":right/total}
         question_type_metrics = {}
         for key,value in total_question_type.items():
@@ -145,7 +146,7 @@ class OmniMedVQA(BaseDataset):
         for key,value in total_modality_type.items():
             right_cnt = right_modality_type[key]
             modality_type_metrics[key] = {"total":value,"right":right_cnt,"acc":right_cnt/value}
-        
+
         metrics = {"total metrics":metrics,"question type metrics":question_type_metrics,"modality type metrics":modality_type_metrics}
         return metrics,out_samples
     
@@ -155,7 +156,7 @@ class OmniMedVQA(BaseDataset):
                 raise ValueError("Chunk inference is not support for download. Try to run eval.sh insteal of eval_chunked.sh")
             print("Start downloading the OmniMedVQA dataset...")
             url="https://huggingface.co/datasets/foreverbeliever/OmniMedVQA/resolve/main/OmniMedVQA.zip"
-            self._download_file_local(local_path=self.dataset_path,url=url)
+            self._download_file_local(local_path=os.path.dirname(self.dataset_path),url=url)
             self._unzip_img_zip_local(local_path=os.path.dirname(self.dataset_path),zip_filename="OmniMedVQA.zip")
             print("Download and extraction completed successfully")
 

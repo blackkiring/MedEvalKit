@@ -4,6 +4,7 @@ import random
 import numpy as np
 from tqdm import tqdm  
 import json
+import time
 from argparse import ArgumentParser
 from LLMs import init_llm
 import gc
@@ -43,6 +44,8 @@ def main():
     parser.add_argument('--tensor_parallel_size', type=str, default="1")
     parser.add_argument('--use_vllm', type=str, default="True")
     parser.add_argument('--reasoning', type=str, default="False")
+    parser.add_argument('--enable_thinking', type=str, default="False",
+                        help='Enable Qwen3 thinking mode (default: False)')
 
     parser.add_argument('--num_chunks', type=str, default="1")
     parser.add_argument('--chunk_idx', type=str, default="0")
@@ -64,7 +67,7 @@ def main():
 
     args = parser.parse_args()
 
-    os.environ["VLLM_USE_V1"] = "0"
+    # os.environ["VLLM_USE_V1"] = "0"
 
     # llm judge setting
     if args.api_key == "None" and args.use_llm_judge == "True":
@@ -91,9 +94,9 @@ def main():
         os.environ["CUDA_VISIBLE_DEVICES"] = args.cuda_visible_devices
     if args.use_vllm == "True":
         os.environ["tensor_parallel_size"] = args.tensor_parallel_size
-        if int(args.tensor_parallel_size) > 1:
-            os.environ["VLLM_WORKER_MULTIPROC_METHOD"] = "spawn"
-            os.environ["TOKENIZERS_PARALLELISM"] = "false"
+        # if int(args.tensor_parallel_size) > 1:
+        os.environ["VLLM_WORKER_MULTIPROC_METHOD"] = "spawn"
+        os.environ["TOKENIZERS_PARALLELISM"] = "false"
     else:
         torch.multiprocessing.set_start_method('spawn')
         os.environ["num_chunks"] = args.num_chunks
@@ -118,8 +121,22 @@ def main():
         os.makedirs(eval_output_path, exist_ok=True)
         benchmark = prepare_benchmark(model,eval_dataset,eval_dataset_path,eval_output_path)
         benchmark.load_data()
+        
+        # 记录开始时间
+        start_time = time.time()
         final_results = benchmark.eval() if benchmark else {}
+        # 记录结束时间并计算总时间
+        end_time = time.time()
+        inference_time = end_time - start_time
+        
+        # 在结果中添加时间信息
+        if isinstance(final_results, dict):
+            final_results['inference_time'] = inference_time
+            final_results['avg_time_per_sample'] = inference_time / len(benchmark.samples) if hasattr(benchmark, 'samples') else None
+        
         print(f'final results on {eval_dataset}: {final_results}')
+        print(f'Total inference time: {inference_time:.2f} seconds')
+        
         if final_results is not None:
             if os.path.exists(total_results_path):
                 with open (total_results_path,"r") as f:

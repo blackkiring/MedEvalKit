@@ -51,7 +51,12 @@ class MMLU(BaseDataset):
 
         choices = "\n".join([f"{alpha}.{choice}" for alpha,choice in zip(alphas,choices)])
         is_reasoning = True if os.environ.get("REASONING","False") == "True" else False
-        prompt = f"Context: {context}" + "\n" + get_multiple_choice_prompt(question,choices,is_reasoning)
+        # prompt = f"Context: {context}" + "\n" + get_multiple_choice_prompt(question,choices,is_reasoning)
+        context = sample.get("context", "")
+        if context:
+            prompt = f"Context: {context}\n" + get_multiple_choice_prompt(question, choices, is_reasoning)
+        else:
+            prompt = get_multiple_choice_prompt(question, choices, is_reasoning)
 
         messages = {"prompt":prompt}
         sample["prompt"] = prompt

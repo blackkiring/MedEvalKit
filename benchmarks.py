@@ -23,6 +23,7 @@ from utils import (
     MIMIC_CXR,
     MedFrameQA,
     Radrestruct,
+    MMLU,
     )
 
 #eval_MedQA_USMLE
@@ -109,6 +110,8 @@ def prepare_benchmark(model,eval_dataset,eval_dataset_path,eval_output_path):
         dataset = MedFrameQA(model,eval_dataset_path,eval_output_path)
     elif eval_dataset == "Radrestruct":
         dataset = Radrestruct(model,eval_dataset_path,eval_output_path)
+    elif eval_dataset == "MMLU":
+        dataset = MMLU(model,eval_dataset_path,eval_output_path)
     else:
         print(f"unknown eval dataset {eval_dataset}, we only support {supported_dataset}")
         dataset = None

@@ -1,0 +1,6 @@
+[submodule "deps/transformers"]
+	path = deps/transformers
+	url = https://github.com/SimLif/transformers.git
+[submodule "deps/vllm"]
+	path = deps/vllm
+	url = https://github.com/SimLif/vllm.git

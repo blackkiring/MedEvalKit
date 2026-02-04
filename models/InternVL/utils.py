@@ -1,5 +1,6 @@
 import torch
 import torchvision.transforms as T
+import numpy as np
 
 from PIL import Image
 from torchvision.transforms.functional import InterpolationMode
@@ -72,7 +73,21 @@ def dynamic_preprocess(image, min_num=1, max_num=12, image_size=448, use_thumbna
     return processed_images
 
 def load_image(image_file, input_size=448, max_num=12):
-    image = Image.open(image_file).convert('RGB')
+    # Handle different input types
+    if isinstance(image_file, str):
+        image = Image.open(image_file).convert('RGB')
+    elif isinstance(image_file, Image.Image):
+        image = image_file.convert('RGB')
+    elif isinstance(image_file, np.ndarray):
+        if image_file.dtype != np.uint8:
+            if image_file.max() <= 1.0:
+                image_file = (image_file * 255).astype(np.uint8)
+            else:
+                image_file = image_file.astype(np.uint8)
+        image = Image.fromarray(image_file).convert('RGB')
+    else:
+        raise TypeError(f"Unsupported image type: {type(image_file)}")
+
     transform = build_transform(input_size=input_size)
     images = dynamic_preprocess(image, image_size=input_size, use_thumbnail=True, max_num=max_num)
     pixel_values = [transform(image) for image in images]

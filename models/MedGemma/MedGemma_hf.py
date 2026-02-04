@@ -1,5 +1,4 @@
 from transformers import AutoProcessor, AutoModelForImageTextToText
-from vllm import LLM, SamplingParams
 import os
 import torch
 

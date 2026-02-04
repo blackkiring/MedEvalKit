@@ -1,0 +1,40 @@
+[project]
+name = "06-med-eval-kit"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = "==3.11.13"
+dependencies = [
+    "accelerate>=1.11.0",
+    "datasets>=4.3.0",
+    "deepspeed>=0.18.2",
+    "flash-attn>=2.5.0",
+    "google-genai>=1.46.0",
+    "mathruler>=0.1.0",
+    "nltk>=3.9.2",
+    "numpy>=2.2.6",
+    "open-clip-torch[training]==3.2.0",
+    "openai>=2.8.1",
+    "pydash>=8.0.5",
+    "pylatexenc>=2.10",
+    "qwen-vl-utils>=0.0.14",
+    "rouge>=1.0.1",
+    "torch==2.8.0",
+    "torchvision==0.23.0",
+    # transformers and vllm are installed from submodules via ./install_deps.sh
+    # "transformers",
+    # "vllm>=0.2.6",
+    # llava has version conflict (requires torchvision==0.16.2), install manually:
+    # uv pip install --no-deps "llava @ git+https://github.com/haotian-liu/LLaVA.git"
+]
+
+[project.optional-dependencies]
+# Use these if you want pip-installed versions instead of submodules
+pip-deps = [
+    "transformers",
+    "vllm>=0.2.6",
+]
+
+[tool.uv]
+# flash-attn requires --no-build-isolation for proper CUDA compilation
+no-build-isolation-package = ["flash-attn"]

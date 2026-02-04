@@ -3,11 +3,13 @@ from transformers import AutoProcessor
 from qwen_vl_utils import process_vision_info
 from transformers import Qwen2VLForConditionalGeneration, AutoTokenizer, AutoProcessor
 
+from .qwen2_vl_moe import EvalMoEQwen2VLForConditionalGeneration
+
 class Qwen2VL:
     def __init__(self,model_path,args):
         super().__init__()
-        self.llm = Qwen2VLForConditionalGeneration.from_pretrained(
-        model_path, torch_dtype=torch.bfloat16, device_map="cuda",attn_implementation="flash_attention_2")
+        self.llm = EvalMoEQwen2VLForConditionalGeneration.from_pretrained(
+        model_path, torch_dtype=torch.bfloat16, device_map="cuda",attn_implementation="sdpa")
         self.processor = AutoProcessor.from_pretrained(model_path)
 
         self.temperature = args.temperature
@@ -67,5 +69,4 @@ class Qwen2VL:
         for messages in messages_list:
             result = self.generate_output(messages)
             res.append(result)
-            torch.cuda.empty_cache()  # 清理显存，防止OOM
         return res

@@ -2,8 +2,30 @@ from transformers import AutoProcessor
 from vllm import LLM, SamplingParams
 import os
 from PIL import Image
+import numpy as np
 
 from .conversations import internvl_conv
+
+
+def ensure_pil_image(image):
+    """Ensure image is a proper PIL Image with RGB mode and uint8 dtype."""
+    if isinstance(image, str):
+        if os.path.exists(image):
+            image = Image.open(image).convert("RGB")
+        else:
+            raise FileNotFoundError(f"Image not found: {image}")
+    elif isinstance(image, Image.Image):
+        image = image.convert("RGB")
+    elif isinstance(image, np.ndarray):
+        # Handle numpy arrays - convert to uint8 if needed
+        if image.dtype != np.uint8:
+            if image.max() <= 1.0:
+                image = (image * 255).astype(np.uint8)
+            else:
+                image = image.astype(np.uint8)
+        image = Image.fromarray(image).convert("RGB")
+    return image
+
 
 class InternVL:
     def __init__(self,model_path,args):
@@ -15,7 +37,8 @@ class InternVL:
             enforce_eager=True,
             gpu_memory_utilization = 0.7,
             limit_mm_per_prompt = {"image": int(os.environ.get("max_image_num",1))},
-
+            dtype="bfloat16",  # Explicitly set dtype
+            max_model_len=8192,  # Limit context length
         )
         self.processor = AutoProcessor.from_pretrained(model_path,trust_remote_code=True)
 
@@ -46,18 +69,13 @@ class InternVL:
         else:
             if "system" in messages:
                 conv.system_message = messages["system"]
-            
-            
+
             if "image" in messages:
                 text = messages["prompt"]
                 inp = "<image>" + '\n' + text
                 conv.append_message(conv.roles[0],inp)
                 image = messages["image"]
-                if isinstance(image,str):
-                    if os.path.exists(image):
-                        image = Image.open(image)
-                elif isinstance(image,Image.Image):
-                    image = image.convert("RGB")
+                image = ensure_pil_image(image)
                 imgs.append(image)
             elif "images" in messages:
                 text = messages["prompt"]
@@ -65,11 +83,7 @@ class InternVL:
                 inp = ""
                 for i,image in enumerate(images):
                     inp = inp + f"<image_{i+1}>: " +"<image>" + '\n'
-                    if isinstance(image,str):
-                        if os.path.exists(image):
-                            image = Image.open(image)
-                    elif isinstance(image,Image.Image):
-                        image = image.convert("RGB")
+                    image = ensure_pil_image(image)
                     imgs.append(image)
                 inp = inp + text
                 conv.append_message(conv.roles[0],inp)
