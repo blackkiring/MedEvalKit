@@ -19,9 +19,9 @@ from openai import OpenAI
 # ============================
 # 全局配置（请根据实际环境修改）
 # ============================
-VLLM_BASE_URL = ""  # vLLM服务地址
-VLLM_API_KEY = ""  # 你的API KEY
-VLLM_MODEL_NAME = ""  # 你的多模态模型名
+#VLLM_BASE_URL = ""  # vLLM服务地址
+#VLLM_API_KEY = ""  # 你的API KEY
+#VLLM_MODEL_NAME = ""  # 你的多模态模型名
 MAX_TOKENS = 8192  # 模型最大生成token数
 TEMPERATURE = 0.01  # 推理温度
 TOP_P = 1.0
