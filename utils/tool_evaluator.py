@@ -26,16 +26,17 @@ from models.base_llm import BaseLLM
 class MedicalToolClient:
     """Tool server client for medical image processing tools."""
     
-    def __init__(self, base_url: str):
+    def __init__(self, base_url: str, timeout: int = 30):
         """
         Initialize the medical tool client.
         
         Args:
             base_url: Base URL of the tool server
+            timeout: Request timeout in seconds (default: 30)
         """
         self.base_url = base_url.rstrip("/")
         self.session = requests.Session()
-        self.session.timeout = 30  # 30 second timeout
+        self.timeout = timeout
 
     def run(self, endpoint: str, payload: dict, expect_binary: bool = False) -> Any:
         """
@@ -54,7 +55,7 @@ class MedicalToolClient:
         """
         url = f"{self.base_url}{endpoint}"
         try:
-            response = self.session.post(url, json=payload)
+            response = self.session.post(url, json=payload, timeout=self.timeout)
             response.raise_for_status()  # Raise HTTP errors
             if expect_binary:
                 return response.content
@@ -102,6 +103,9 @@ class ToolEvaluator:
         ... )
         >>> result = tool_evaluator.generate_output(messages)
     """
+    
+    # Constants for medical image processing
+    MIN_BBOX_SIZE = 10  # Minimum bounding box dimensions in pixels
     
     def __init__(
         self,
@@ -251,11 +255,11 @@ class ToolEvaluator:
         x2 = max(0, min(int(round(x2)), width))
         y2 = max(0, min(int(round(y2)), height))
         
-        # Fix invalid bounding boxes
+        # Fix invalid bounding boxes using minimum size
         if x2 <= x1:
-            x2 = min(x1 + 10, width)
+            x2 = min(x1 + self.MIN_BBOX_SIZE, width)
         if y2 <= y1:
-            y2 = min(y1 + 10, height)
+            y2 = min(y1 + self.MIN_BBOX_SIZE, height)
         
         return x1, y1, x2, y2
     
@@ -547,15 +551,30 @@ class ToolEvaluator:
                     tool_name = match.group(1).strip()
                     json_part = match.group(2).strip()
                     
-                    # Remove JSON comments
+                    # Remove JSON comments (limitation: may fail if JSON strings contain /* or */)
                     json_part = self._strip_json_comments(json_part)
                     
                     # Parse JSON arguments
                     arguments = json.loads(json_part)
                     
                     # Handle array or single object
-                    if isinstance(arguments, list) and len(arguments) > 0:
-                        arguments = arguments[0]  # Take first item for single tool call
+                    # Note: In medical tools format, arrays can contain multiple tool calls,
+                    # but we only process the first one per tool invocation
+                    if isinstance(arguments, list):
+                        if len(arguments) == 0:
+                            arguments = {}
+                        elif len(arguments) > 1:
+                            # Log warning if multiple items present (only first will be used)
+                            import warnings
+                            warnings.warn(
+                                f"Tool call contains {len(arguments)} items in array, "
+                                f"but only the first will be processed. "
+                                f"Consider making separate tool calls for each item.",
+                                UserWarning
+                            )
+                            arguments = arguments[0]
+                        else:
+                            arguments = arguments[0]
                     
                     return {
                         "name": tool_name,
