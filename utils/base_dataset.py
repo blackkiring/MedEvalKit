@@ -1,6 +1,7 @@
 import torch
 import os
 import json
+import hashlib
 
 from tqdm import tqdm
 import gc
@@ -74,9 +75,14 @@ class BaseDataset:
       if "id" in sample:
           return f"id:{sample['id']}"
       if "question" in sample and "answer" in sample:
-          return f"qa:{hash(str(sample['question']) + str(sample['answer']))}"
+          # Use stable hash that's consistent across restarts
+          content = str(sample['question']) + str(sample['answer'])
+          hash_value = hashlib.md5(content.encode()).hexdigest()
+          return f"qa:{hash_value}"
       # Fallback to full sample hash
-      return f"hash:{hash(json.dumps(sample, sort_keys=True))}"
+      content = json.dumps(sample, sort_keys=True)
+      hash_value = hashlib.md5(content.encode()).hexdigest()
+      return f"hash:{hash_value}"
   
   def _filter_remaining_samples(self, samples, existing_results):
       """Filter out samples that have already been processed."""

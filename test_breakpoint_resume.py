@@ -4,6 +4,7 @@ Test script to verify breakpoint resume functionality.
 import os
 import sys
 import json
+import hashlib
 import tempfile
 
 # Add the parent directory to path
@@ -20,8 +21,12 @@ def test_resume_logic():
         if "id" in sample:
             return f"id:{sample['id']}"
         if "question" in sample and "answer" in sample:
-            return f"qa:{hash(str(sample['question']) + str(sample['answer']))}"
-        return f"hash:{hash(json.dumps(sample, sort_keys=True))}"
+            content = str(sample['question']) + str(sample['answer'])
+            hash_value = hashlib.md5(content.encode()).hexdigest()
+            return f"qa:{hash_value}"
+        content = json.dumps(sample, sort_keys=True)
+        hash_value = hashlib.md5(content.encode()).hexdigest()
+        return f"hash:{hash_value}"
     
     def _filter_remaining_samples(samples, existing_results):
         """Filter out samples that have already been processed."""

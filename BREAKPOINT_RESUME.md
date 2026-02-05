@@ -171,17 +171,23 @@ Resume support is implemented for:
 
 ### Sample Matching
 
-Samples are matched using a unique key:
+Samples are matched using a unique key with stable hashing:
 ```python
+import hashlib
+
 def _get_sample_key(sample):
     if "id" in sample:
         return f"id:{sample['id']}"
     if "question" in sample and "answer" in sample:
-        return f"qa:{hash(str(sample['question']) + str(sample['answer']))}"
-    return f"hash:{hash(json.dumps(sample, sort_keys=True))}"
+        content = str(sample['question']) + str(sample['answer'])
+        hash_value = hashlib.md5(content.encode()).hexdigest()
+        return f"qa:{hash_value}"
+    content = json.dumps(sample, sort_keys=True)
+    hash_value = hashlib.md5(content.encode()).hexdigest()
+    return f"hash:{hash_value}"
 ```
 
-This ensures reliable matching across different dataset formats.
+This ensures reliable matching across different dataset formats and Python interpreter restarts.
 
 ### Metrics Recalculation
 
