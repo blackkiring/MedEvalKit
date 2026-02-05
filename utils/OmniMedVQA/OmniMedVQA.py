@@ -11,7 +11,7 @@ from tqdm import tqdm
 from ..utils import save_json,extract,judge_multi_choice
 from ..base_dataset import BaseDataset
 
-from ..question_formats import get_multiple_choice_prompt
+from ..question_formats import get_multiple_choice_prompt, get_image_index_info, add_image_index_to_prompt
 
 class OmniMedVQA(BaseDataset):
     def __init__(self,model,dataset_path,output_path):
@@ -21,6 +21,15 @@ class OmniMedVQA(BaseDataset):
         self.samples = []
         self.chunk_idx = int(os.environ.get("chunk_idx",0))
         self.num_chunks = int(os.environ.get("num_chunks",1))
+    
+    def _close_images(self, sample):
+        """Helper to close opened images in sample messages."""
+        if "images" in sample["messages"]:
+            for img in sample["messages"]["images"]:
+                if hasattr(img, 'close'):
+                    img.close()
+        elif "image" in sample["messages"] and hasattr(sample["messages"]["image"], 'close'):
+            sample["messages"]["image"].close()
     
     def run_model(self,samples, model, num_chunks=1, save_json_path=None):
         out_samples = []
@@ -42,10 +51,14 @@ class OmniMedVQA(BaseDataset):
             if num_chunks > 1:
                 for current_messages,current_samples in tqdm(messages_list):
                     for i in range(len(current_messages)):
-                        current_messages[i]["image"] = Image.open(current_messages[i]["image"])
+                        # Handle both "images" (list) and "image" (single) for backward compatibility
+                        if "images" in current_messages[i]:
+                            current_messages[i]["images"] = [Image.open(img) if isinstance(img, str) else img for img in current_messages[i]["images"]]
+                        elif "image" in current_messages[i]:
+                            current_messages[i]["image"] = Image.open(current_messages[i]["image"])
                     outputs = model.generate_outputs(current_messages)
                     for sample,response in zip(current_samples,outputs):
-                        sample["messages"]["image"].close()
+                        self._close_images(sample)
                         del sample["messages"]
                         sample["response"] = response
                         out_samples.append(sample)   
@@ -54,10 +67,14 @@ class OmniMedVQA(BaseDataset):
                 f = open(save_json_path,"w")
                 for current_messages,current_samples in tqdm(messages_list):
                     for i in range(len(current_messages)):
-                        current_messages[i]["image"] = Image.open(current_messages[i]["image"])
+                        # Handle both "images" (list) and "image" (single) for backward compatibility
+                        if "images" in current_messages[i]:
+                            current_messages[i]["images"] = [Image.open(img) if isinstance(img, str) else img for img in current_messages[i]["images"]]
+                        elif "image" in current_messages[i]:
+                            current_messages[i]["image"] = Image.open(current_messages[i]["image"])
                     outputs = model.generate_outputs(current_messages)
                     for sample,response in zip(current_samples,outputs):
-                        sample["messages"]["image"].close()
+                        self._close_images(sample)
                         del sample["messages"]
                         sample["response"] = response
                         f.write(json.dumps(sample) + "\n")
@@ -100,8 +117,13 @@ class OmniMedVQA(BaseDataset):
                 
         is_reasoning = True if os.environ.get("REASONING","False") == "True" else False
         prompt = get_multiple_choice_prompt(question,choices,is_reasoning)
+        
+        # Add image index information for single image
+        image_index_info = get_image_index_info(1)
+        prompt = add_image_index_to_prompt(prompt, image_index_info)
             
-        messages = {"prompt":prompt,"image":image}
+        # Use "images" (plural) for consistency with MMMU
+        messages = {"prompt":prompt,"images":[image]}
         sample["messages"] = messages
         sample["choices"] = choices
         sample["answer"] = sample["gt_answer"]

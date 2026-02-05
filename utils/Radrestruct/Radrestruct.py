@@ -5,7 +5,7 @@ from PIL import Image
 from tqdm import tqdm
 from pydash import at
 from mathruler.grader import extract_boxed_content
-from ..question_formats import get_judgement_prompt,get_multiple_choice_prompt
+from ..question_formats import get_judgement_prompt,get_multiple_choice_prompt, get_image_index_info, add_image_index_to_prompt
 from ..utils import save_json,extract,judge_multi_choice,judge_close_end_vqa,judge_judgement
 from ..base_dataset import BaseDataset
 
@@ -69,7 +69,13 @@ class Radrestruct(BaseDataset):
                 prompt = get_judgement_prompt(question,is_reasoning)
             else:
                 prompt = get_multiple_choice_prompt(question,options,is_reasoning)
-            messages = {"prompt":prompt,"image":img}
+            
+            # Add image index information for single image
+            image_index_info = get_image_index_info(1)
+            prompt = add_image_index_to_prompt(prompt, image_index_info)
+            
+            # Use "images" (plural) for consistency with MMMU
+            messages = {"prompt":prompt,"images":[img]}
             sample["messages"] = messages
             sample["answer_type"] = answer_type
             sample["question"] = question

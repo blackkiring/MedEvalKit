@@ -11,7 +11,7 @@ from tqdm import tqdm
 from ..utils import save_json,extract,judge_multi_choice
 from ..base_dataset import BaseDataset
 
-from ..question_formats import get_multiple_choice_prompt
+from ..question_formats import get_multiple_choice_prompt, get_image_index_info, add_image_index_to_prompt
 
 class MedXpertQA(BaseDataset):
     def __init__(self,model,dataset_path,output_path,split = "MM"):
@@ -55,16 +55,23 @@ class MedXpertQA(BaseDataset):
             choices.append(choice)
                 
         is_reasoning = True if os.environ.get("REASONING","False") == "True" else False
-        prompt = get_multiple_choice_prompt(question,choices,is_reasoning)
-            
+        
         if "images" in sample:
             images = sample["images"]
             images = [os.path.join(self.dataset_path,"images",image) for image in images]
             images = [Image.open(image) for image in images]
+            
+            # Add image index information to the prompt
+            image_index_info = get_image_index_info(len(images))
+            prompt = get_multiple_choice_prompt(question,choices,is_reasoning)
+            prompt = add_image_index_to_prompt(prompt, image_index_info)
+            
             messages = {"prompt":prompt,"images":images}
             del sample["images"]
         else:
+            prompt = get_multiple_choice_prompt(question,choices,is_reasoning)
             messages = {"prompt":prompt}
+            
         sample["messages"] = messages
         sample["choices"] = choices
         sample["answer"] = answer

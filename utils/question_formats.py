@@ -62,9 +62,68 @@ def get_open_ended_prompt(question,is_reasoning = False, lang = "en"):
             prompt = question + "\n" + "请简要回答该问题。"
     return prompt
 
-def get_report_generation_prompt():
-    prompt = "You are a helpful assistant. Please generate a report for the given images, including both findings and impressions. Return the report in the following format: Findings: {} Impression: {}."
-    return prompt
+def get_report_generation_prompt(image_index_info=""):
+    """Generate prompt for report generation tasks.
+    
+    Args:
+        image_index_info: Optional image index information to include in the prompt
+        
+    Returns:
+        Prompt string for report generation
+    """
+    base_prompt = "You are a helpful assistant."
+    if image_index_info:
+        base_prompt += f" {image_index_info}"
+    base_prompt += " Please generate a report for the given images, including both findings and impressions. Return the report in the following format: Findings: {} Impression: {}."
+    return base_prompt
 
+def get_image_index_info(num_images):
+    """
+    Generate image index information for prompts based on the number of images.
+    
+    Args:
+        num_images: Number of images in the sample
+        
+    Returns:
+        String with image index information
+    """
+    if num_images == 0:
+        return ""
+    elif num_images == 1:
+        return "The index of the given image is 1.\n"
+    else:
+        indices = ", ".join(str(i) for i in range(1, num_images + 1))
+        return f"The indices of the given images are {indices}.\n"
+
+def add_image_index_to_prompt(prompt, image_index_info):
+    """
+    Add image index information to a prompt before the answer instruction.
+    
+    This is a helper function to consistently insert image index info into prompts
+    across different datasets. It attempts to insert the info before the last line
+    (which typically contains the answer instruction).
+    
+    Args:
+        prompt: The original prompt text
+        image_index_info: Image index information string to insert
+        
+    Returns:
+        Modified prompt with image index info inserted
+        
+    Note:
+        This function assumes the last line (after the last newline) contains
+        the answer instruction. If the prompt doesn't follow this format,
+        the image index info will be appended at the end.
+    """
+    if not image_index_info:
+        return prompt
+    
+    # Try to split before the last newline (where answer instruction usually is)
+    parts = prompt.rsplit('\n', 1)
+    if len(parts) == 2:
+        return parts[0] + '\n' + image_index_info + parts[1]
+    else:
+        # If no newline found, append at the end
+        return prompt + '\n' + image_index_info
 
 

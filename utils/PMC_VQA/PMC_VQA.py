@@ -12,7 +12,7 @@ from tqdm import tqdm
 from ..utils import save_json,judge_multi_choice
 from ..base_dataset import BaseDataset
 
-from ..question_formats import get_multiple_choice_prompt
+from ..question_formats import get_multiple_choice_prompt, get_image_index_info, add_image_index_to_prompt
 
 class PMC_VQA(BaseDataset):
     def __init__(self,model,dataset_path,output_path):
@@ -58,7 +58,13 @@ class PMC_VQA(BaseDataset):
     def construct_messages(self,sample):
         prompt = sample["prompt"]
         image = sample["image"] if os.path.exists(sample["image"]) else os.path.join(self.dataset_path, "images", sample["image"])
-        messages = {"prompt":prompt,"image":image}
+        
+        # Add image index information for single image
+        image_index_info = get_image_index_info(1)
+        prompt = add_image_index_to_prompt(prompt, image_index_info)
+        
+        # Use "images" (plural) for consistency with MMMU
+        messages = {"prompt":prompt,"images":[image]}
         sample["messages"] = messages
         del sample["image"]
         return sample
