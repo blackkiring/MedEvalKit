@@ -66,5 +66,22 @@ def get_report_generation_prompt():
     prompt = "You are a helpful assistant. Please generate a report for the given images, including both findings and impressions. Return the report in the following format: Findings: {} Impression: {}."
     return prompt
 
+def get_image_index_info(num_images):
+    """
+    Generate image index information for prompts based on the number of images.
+    
+    Args:
+        num_images: Number of images in the sample
+        
+    Returns:
+        String with image index information
+    """
+    if num_images == 0:
+        return ""
+    elif num_images == 1:
+        return "The index of the given image is 1.\n"
+    else:
+        indices = ", ".join(str(i) for i in range(1, num_images + 1))
+        return f"The indices of the given images are {indices}.\n"
 
 

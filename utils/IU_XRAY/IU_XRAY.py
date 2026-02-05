@@ -14,7 +14,7 @@ import numpy as np
 from ..utils import save_json,extract
 from ..base_dataset import BaseDataset
 
-from ..question_formats import get_report_generation_prompt
+from ..question_formats import get_report_generation_prompt, get_image_index_info
 
 class IU_XRAY(BaseDataset):
     def __init__(self,model,dataset_path,output_path):
@@ -52,7 +52,17 @@ class IU_XRAY(BaseDataset):
         findings = "None" if findings.strip() == "" else findings
         impression = "None" if impression.strip() == "" else impression
         
+        # Get base prompt
         prompt = get_report_generation_prompt()
+        
+        # Add image index information
+        image_index_info = get_image_index_info(len(images))
+        if image_index_info:
+            # Insert image index info after the initial instruction
+            prompt = prompt.replace(
+                "You are a helpful assistant. ", 
+                f"You are a helpful assistant. {image_index_info}"
+            )
 
         messages = {"prompt":prompt,"images":images}
         sample["messages"] = messages

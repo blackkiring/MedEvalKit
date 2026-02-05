@@ -14,7 +14,7 @@ import numpy as np
 from ..utils import save_json,extract
 from ..base_dataset import BaseDataset
 
-from ..question_formats import get_report_generation_prompt
+from ..question_formats import get_report_generation_prompt, get_image_index_info
 
 class CheXpert_Plus(BaseDataset):
     def __init__(self,model,dataset_path,output_path):
@@ -52,8 +52,17 @@ class CheXpert_Plus(BaseDataset):
         findings = "None" if findings.strip() == "" else findings
         impression = "None" if impression.strip() == "" else impression
         
+        # Get base prompt and add image index information
         prompt = get_report_generation_prompt()
-        messages = {"prompt":prompt,"image":image}
+        image_index_info = get_image_index_info(1)
+        if image_index_info:
+            prompt = prompt.replace(
+                "You are a helpful assistant. ", 
+                f"You are a helpful assistant. {image_index_info}"
+            )
+        
+        # Use "images" (plural) for consistency with MMMU
+        messages = {"prompt":prompt,"images":[image]}
         sample["messages"] = messages
         return sample
 
