@@ -88,9 +88,9 @@ class HuatuoGPT:
                 tokenize=False,
                 add_generation_prompt=True
             )
-        except Exception:
-            # Fallback: if apply_chat_template fails, use basic formatting
-            # This happens when tokenizer doesn't have a chat_template defined
+        except (AttributeError, TypeError, ValueError):
+            # Fallback: if apply_chat_template fails (no chat_template defined, or other issues),
+            # use the custom huatuo conversation template
             from .conversation import conv_templates
             conv = conv_templates["huatuo"].copy()
             conv.messages = []
