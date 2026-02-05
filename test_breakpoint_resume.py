@@ -22,10 +22,10 @@ def test_resume_logic():
             return f"id:{sample['id']}"
         if "question" in sample and "answer" in sample:
             content = str(sample['question']) + str(sample['answer'])
-            hash_value = hashlib.md5(content.encode()).hexdigest()
+            hash_value = hashlib.sha256(content.encode()).hexdigest()
             return f"qa:{hash_value}"
         content = json.dumps(sample, sort_keys=True)
-        hash_value = hashlib.md5(content.encode()).hexdigest()
+        hash_value = hashlib.sha256(content.encode()).hexdigest()
         return f"hash:{hash_value}"
     
     def _filter_remaining_samples(samples, existing_results):

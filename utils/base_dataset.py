@@ -77,11 +77,11 @@ class BaseDataset:
       if "question" in sample and "answer" in sample:
           # Use stable hash that's consistent across restarts
           content = str(sample['question']) + str(sample['answer'])
-          hash_value = hashlib.md5(content.encode()).hexdigest()
+          hash_value = hashlib.sha256(content.encode()).hexdigest()
           return f"qa:{hash_value}"
       # Fallback to full sample hash
       content = json.dumps(sample, sort_keys=True)
-      hash_value = hashlib.md5(content.encode()).hexdigest()
+      hash_value = hashlib.sha256(content.encode()).hexdigest()
       return f"hash:{hash_value}"
   
   def _filter_remaining_samples(self, samples, existing_results):
