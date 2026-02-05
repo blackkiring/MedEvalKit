@@ -14,9 +14,41 @@ from .eval_utils import evaluate,parse_multi_choice_response, parse_open_respons
 from ..utils import extract
 
 
-def run_model(samples, model,):
+def _load_existing_test_results(output_file):
+    """Load existing processed results if file exists."""
+    if not os.path.exists(output_file):
+        return None
+    
+    try:
+        with open(output_file, "r") as f:
+            existing_results = json.load(f)
+        if isinstance(existing_results, dict) and len(existing_results) > 0:
+            return existing_results
+    except (json.JSONDecodeError, IOError) as e:
+        print(f"Warning: Could not load existing results from {output_file}: {e}")
+    
+    return None
+
+def run_model(samples, model, existing_samples=None, existing_response=None):
+    """Run model on samples, skipping already processed ones if existing results provided."""
+    # If we have existing results, filter out already-processed ones
+    if existing_samples and existing_response:
+        existing_ids = set(existing_samples.keys())
+        remaining_samples = [s for s in samples if s["id"] not in existing_ids]
+        
+        if len(remaining_samples) < len(samples):
+            print(f"Resume: Skipping {len(samples) - len(remaining_samples)} already-processed samples")
+            print(f"Resume: Processing {len(remaining_samples)} remaining samples")
+        
+        samples = remaining_samples
+    
     out_samples = {}
     out_response = {}
+    
+    if not samples:
+        print("All samples already processed. Skipping inference.")
+        return existing_samples if existing_samples else {}, existing_response if existing_response else {}
+    
     with torch.no_grad():
         messages_list = []
         current_messages = []
@@ -44,7 +76,14 @@ def run_model(samples, model,):
                 else:
                     pred_ans = response
                 out_samples[sample['id']] = pred_ans    
-                out_response[sample['id']] = response  
+                out_response[sample['id']] = response
+    
+    # Combine existing and new results
+    if existing_samples:
+        out_samples = {**existing_samples, **out_samples}
+    if existing_response:
+        out_response = {**existing_response, **out_response}
+    
     return out_samples,out_response
 
 
@@ -67,7 +106,14 @@ def eval_MMMU_test(model,dataset_path,output_path,subset):
     if num_chunks == 1:
         results_path = os.path.join(output_path,"results.json")
         response_path = os.path.join(output_path,"response.json")
-        out_samples,out_response = run_model(samples,model)
+        
+        # Check for existing results to enable resume
+        existing_samples = _load_existing_test_results(results_path)
+        existing_response = _load_existing_test_results(response_path)
+        if existing_samples:
+            print(f"Found {len(existing_samples)} existing results")
+        
+        out_samples,out_response = run_model(samples, model, existing_samples, existing_response)
         save_json(results_path,out_samples)
         save_json(response_path,out_response)
         return "please upload in https://eval.ai/web/challenges/challenge-page/2179/leaderboard to get the results"
@@ -75,7 +121,14 @@ def eval_MMMU_test(model,dataset_path,output_path,subset):
     elif num_chunks > 1:
         results_path = os.path.join(output_path,f"results_{chunk_idx}.json")
         response_path = os.path.join(output_path,f"response_{chunk_idx}.json")
-        out_samples,out_response = run_model(samples,model)
+        
+        # Check for existing chunk results to enable resume
+        existing_samples = _load_existing_test_results(results_path)
+        existing_response = _load_existing_test_results(response_path)
+        if existing_samples:
+            print(f"Chunk {chunk_idx}: Found {len(existing_samples)} existing results")
+        
+        out_samples,out_response = run_model(samples, model, existing_samples, existing_response)
         save_json(results_path,out_samples)
         save_json(response_path,out_response)
 

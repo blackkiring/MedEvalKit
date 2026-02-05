@@ -51,6 +51,66 @@ class BaseDataset:
   def construct_messages(self):
     pass
 
+  def _load_existing_results(self, results_path):
+      """Load existing results from file if it exists and is valid."""
+      if not os.path.exists(results_path):
+          return None
+      
+      try:
+          with open(results_path, "r") as f:
+              existing_results = json.load(f)
+          if isinstance(existing_results, list) and len(existing_results) > 0:
+              print(f"Found existing results with {len(existing_results)} samples at {results_path}")
+              return existing_results
+      except (json.JSONDecodeError, IOError) as e:
+          print(f"Warning: Could not load existing results from {results_path}: {e}")
+          return None
+      
+      return None
+  
+  def _get_sample_key(self, sample):
+      """Generate a unique key for a sample to identify duplicates."""
+      # Try common unique identifiers
+      if "id" in sample:
+          return f"id:{sample['id']}"
+      if "question" in sample and "answer" in sample:
+          return f"qa:{hash(str(sample['question']) + str(sample['answer']))}"
+      # Fallback to full sample hash
+      return f"hash:{hash(json.dumps(sample, sort_keys=True))}"
+  
+  def _filter_remaining_samples(self, samples, existing_results):
+      """Filter out samples that have already been processed."""
+      if not existing_results:
+          return samples, []
+      
+      # Build a set of processed sample keys
+      processed_keys = set()
+      for result in existing_results:
+          # Only consider completed samples (those with responses)
+          if "response" in result:
+              key = self._get_sample_key(result)
+              processed_keys.add(key)
+      
+      # Filter samples
+      remaining_samples = []
+      existing_samples = []
+      for sample in samples:
+          key = self._get_sample_key(sample)
+          if key in processed_keys:
+              # Find the matching result from existing results
+              for result in existing_results:
+                  if "response" in result and self._get_sample_key(result) == key:
+                      existing_samples.append(result)
+                      break
+          else:
+              remaining_samples.append(sample)
+      
+      if len(remaining_samples) < len(samples):
+          print(f"Resume: Skipping {len(samples) - len(remaining_samples)} already-processed samples")
+          print(f"Resume: Processing {len(remaining_samples)} remaining samples")
+      
+      return remaining_samples, existing_samples
+
   def eval(self):
       model = self.model
       dataset_path = self.dataset_path
@@ -60,7 +120,20 @@ class BaseDataset:
       if num_chunks == 1:
           results_path = os.path.join(output_path,"results.json")
           matric_path = os.path.join(output_path,"metrics.json")
-          out_samples = self.run(self.samples,model)
+          
+          # Check for existing results and resume if found
+          existing_results = self._load_existing_results(results_path)
+          remaining_samples, completed_samples = self._filter_remaining_samples(self.samples, existing_results)
+          
+          # Process only remaining samples
+          if remaining_samples:
+              new_out_samples = self.run(remaining_samples, model)
+              # Combine existing and new results
+              out_samples = completed_samples + new_out_samples
+          else:
+              print("All samples already processed. Skipping inference.")
+              out_samples = completed_samples
+          
           save_json(results_path,out_samples)
 
           metrics,out_samples = self.cal_metrics(out_samples)
@@ -71,7 +144,20 @@ class BaseDataset:
       elif num_chunks > 1:
         results_path = os.path.join(output_path,f"results_{chunk_idx}.json")
         final_results_path = os.path.join(output_path,"results.json")
-        out_samples = self.run(self.samples,model)
+        
+        # Check for existing chunk results and resume if found
+        existing_results = self._load_existing_results(results_path)
+        remaining_samples, completed_samples = self._filter_remaining_samples(self.samples, existing_results)
+        
+        # Process only remaining samples
+        if remaining_samples:
+            new_out_samples = self.run(remaining_samples, model)
+            # Combine existing and new results
+            out_samples = completed_samples + new_out_samples
+        else:
+            print(f"Chunk {chunk_idx}: All samples already processed. Skipping inference.")
+            out_samples = completed_samples
+        
         save_json(results_path,out_samples)
 
         total_results_path = os.listdir(output_path)
