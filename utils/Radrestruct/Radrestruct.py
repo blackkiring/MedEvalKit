@@ -5,7 +5,7 @@ from PIL import Image
 from tqdm import tqdm
 from pydash import at
 from mathruler.grader import extract_boxed_content
-from ..question_formats import get_judgement_prompt,get_multiple_choice_prompt, get_image_index_info
+from ..question_formats import get_judgement_prompt,get_multiple_choice_prompt, get_image_index_info, add_image_index_to_prompt
 from ..utils import save_json,extract,judge_multi_choice,judge_close_end_vqa,judge_judgement
 from ..base_dataset import BaseDataset
 
@@ -72,12 +72,7 @@ class Radrestruct(BaseDataset):
             
             # Add image index information for single image
             image_index_info = get_image_index_info(1)
-            if image_index_info:
-                parts = prompt.rsplit('\n', 1)
-                if len(parts) == 2:
-                    prompt = parts[0] + '\n' + image_index_info + parts[1]
-                else:
-                    prompt = prompt + '\n' + image_index_info
+            prompt = add_image_index_to_prompt(prompt, image_index_info)
             
             # Use "images" (plural) for consistency with MMMU
             messages = {"prompt":prompt,"images":[img]}

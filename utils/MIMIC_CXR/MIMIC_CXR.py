@@ -86,14 +86,9 @@ class MIMIC_CXR(BaseDataset):
         findings = "None" if findings.strip() == "" else findings
         impression = "None" if impression.strip() == "" else impression
         
-        # Get base prompt and add image index information
-        prompt = get_report_generation_prompt()
+        # Get prompt with image index information
         image_index_info = get_image_index_info(len(images))
-        if image_index_info:
-            prompt = prompt.replace(
-                "You are a helpful assistant. ", 
-                f"You are a helpful assistant. {image_index_info}"
-            )
+        prompt = get_report_generation_prompt(image_index_info)
         
         messages = {"prompt":prompt,"images":images}
         sample["messages"] = messages

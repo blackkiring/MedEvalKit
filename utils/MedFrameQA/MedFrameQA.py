@@ -12,7 +12,7 @@ from tqdm import tqdm
 from ..utils import save_json,judge_multi_choice
 from ..base_dataset import BaseDataset
 
-from ..question_formats import get_multiple_choice_prompt, get_image_index_info
+from ..question_formats import get_multiple_choice_prompt, get_image_index_info, add_image_index_to_prompt
 
 class MedFrameQA(BaseDataset):
     def __init__(self,model,dataset_path,output_path):
@@ -84,15 +84,7 @@ class MedFrameQA(BaseDataset):
         # Add image index information to the prompt
         image_index_info = get_image_index_info(len(images))
         prompt = get_multiple_choice_prompt(question,choices,is_reasoning)
-        
-        # Insert image index info before the answer instruction
-        if image_index_info:
-            # Split the prompt to insert image index info before the answer instruction
-            parts = prompt.rsplit('\n', 1)
-            if len(parts) == 2:
-                prompt = parts[0] + '\n' + image_index_info + parts[1]
-            else:
-                prompt = prompt + '\n' + image_index_info
+        prompt = add_image_index_to_prompt(prompt, image_index_info)
 
         messages = {"prompt":prompt,"images":images}
         sample["messages"] = messages
