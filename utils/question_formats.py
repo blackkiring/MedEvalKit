@@ -100,7 +100,8 @@ def add_image_index_to_prompt(prompt, image_index_info):
     Add image index information to a prompt before the answer instruction.
     
     This is a helper function to consistently insert image index info into prompts
-    across different datasets.
+    across different datasets. It attempts to insert the info before the last line
+    (which typically contains the answer instruction).
     
     Args:
         prompt: The original prompt text
@@ -108,6 +109,11 @@ def add_image_index_to_prompt(prompt, image_index_info):
         
     Returns:
         Modified prompt with image index info inserted
+        
+    Note:
+        This function assumes the last line (after the last newline) contains
+        the answer instruction. If the prompt doesn't follow this format,
+        the image index info will be appended at the end.
     """
     if not image_index_info:
         return prompt

@@ -22,6 +22,15 @@ class OmniMedVQA(BaseDataset):
         self.chunk_idx = int(os.environ.get("chunk_idx",0))
         self.num_chunks = int(os.environ.get("num_chunks",1))
     
+    def _close_images(self, sample):
+        """Helper to close opened images in sample messages."""
+        if "images" in sample["messages"]:
+            for img in sample["messages"]["images"]:
+                if hasattr(img, 'close'):
+                    img.close()
+        elif "image" in sample["messages"] and hasattr(sample["messages"]["image"], 'close'):
+            sample["messages"]["image"].close()
+    
     def run_model(self,samples, model, num_chunks=1, save_json_path=None):
         out_samples = []
         with torch.no_grad():
@@ -49,12 +58,7 @@ class OmniMedVQA(BaseDataset):
                             current_messages[i]["image"] = Image.open(current_messages[i]["image"])
                     outputs = model.generate_outputs(current_messages)
                     for sample,response in zip(current_samples,outputs):
-                        if "images" in sample["messages"]:
-                            for img in sample["messages"]["images"]:
-                                if hasattr(img, 'close'):
-                                    img.close()
-                        elif "image" in sample["messages"] and hasattr(sample["messages"]["image"], 'close'):
-                            sample["messages"]["image"].close()
+                        self._close_images(sample)
                         del sample["messages"]
                         sample["response"] = response
                         out_samples.append(sample)   
@@ -70,12 +74,7 @@ class OmniMedVQA(BaseDataset):
                             current_messages[i]["image"] = Image.open(current_messages[i]["image"])
                     outputs = model.generate_outputs(current_messages)
                     for sample,response in zip(current_samples,outputs):
-                        if "images" in sample["messages"]:
-                            for img in sample["messages"]["images"]:
-                                if hasattr(img, 'close'):
-                                    img.close()
-                        elif "image" in sample["messages"] and hasattr(sample["messages"]["image"], 'close'):
-                            sample["messages"]["image"].close()
+                        self._close_images(sample)
                         del sample["messages"]
                         sample["response"] = response
                         f.write(json.dumps(sample) + "\n")
