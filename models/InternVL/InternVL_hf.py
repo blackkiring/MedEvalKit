@@ -27,28 +27,43 @@ class InternVL:
     
 
     def process_messages(self,messages):
-        prompt = ""
+        # Build messages in the standard chat format
+        chat_messages = []
+        
+        # Add system message if present
         if "system" in messages:
-            prompt = messages["system"]
-
+            chat_messages.append({"role": "system", "content": messages["system"]})
+        
+        # Build user message content
+        user_content = []
+        pixel_value = None
+        
         if "image" in messages:
-            text = messages["prompt"]
-            prompt = prompt + "\n" + "<image>" + '\n' + text
             image = messages["image"]
             pixel_value = load_image(image).to(torch.bfloat16).to("cuda")
+            user_content.append({"type": "image"})
+            user_content.append({"type": "text", "text": messages["prompt"]})
         elif "images" in messages:
-            text = messages["prompt"]
             images = messages["images"]
-            for i,image in enumerate(images):
-                prompt = prompt + f"<image_{i+1}>: <image>" + "\n"
-            prompt = prompt + '\n' + text
-            pixel_value = [load_image(image).to(torch.bfloat16).to("cuda") for image in images]
-            pixel_value = torch.cat(pixel_value,dim=0)
+            for i, image in enumerate(images):
+                user_content.append({"type": "text", "text": f"<image_{i+1}>: "})
+                user_content.append({"type": "image"})
+            user_content.append({"type": "text", "text": messages["prompt"]})
+            pixel_value = [load_image(img).to(torch.bfloat16).to("cuda") for img in images]
+            pixel_value = torch.cat(pixel_value, dim=0)
         else:
-            text = messages["prompt"]
-            prompt = prompt + "\n" + text
-            pixel_value = None
-
+            user_content.append({"type": "text", "text": messages["prompt"]})
+        
+        chat_messages.append({"role": "user", "content": user_content})
+        
+        # Use tokenizer's apply_chat_template to format the prompt correctly
+        # This ensures we use the official InternVL chat template
+        prompt = self.tokenizer.apply_chat_template(
+            chat_messages,
+            tokenize=False,
+            add_generation_prompt=True
+        )
+        
         llm_inputs = {
             "prompt": prompt,
             "pixel_values": pixel_value

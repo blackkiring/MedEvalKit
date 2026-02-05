@@ -7,10 +7,8 @@ from tqdm import tqdm
 from llava.model.builder import load_pretrained_model
 from llava.mm_utils import get_model_name_from_path, process_images, tokenizer_image_token
 from llava.constants import IMAGE_TOKEN_INDEX, DEFAULT_IMAGE_TOKEN, DEFAULT_IM_START_TOKEN, DEFAULT_IM_END_TOKEN, IGNORE_INDEX
-from llava.conversation import conv_templates, SeparatorStyle, Conversation
 from transformers import CLIPImageProcessor
 
-import copy
 import torch
 
 
@@ -31,24 +29,6 @@ def download_image(url):
     except Exception as e:
         print(f"Error downloading image from URL {url}: {e}")
         return None
-
-# Register llava_llama_3 conversation template for BiMediX2 (Llama-3 based model)
-if "llava_llama_3" not in conv_templates:
-    # BiMediX2 uses Llama-3 format
-    # Using TWO separator style which is compatible with Llama-3's conversation format
-    conv_llava_llama_3 = Conversation(
-        system="You are a helpful language and vision assistant. "
-               "You are able to understand the visual content that the user provides, "
-               "and assist the user with a variety of tasks using natural language.",
-        roles=("user", "assistant"),
-        version="llama_v3",
-        messages=[],
-        offset=0,
-        sep_style=SeparatorStyle.TWO,
-        sep="<|eot_id|>",
-        sep2="<|eot_id|>",
-    )
-    conv_templates["llava_llama_3"] = conv_llava_llama_3
 
 class BiMediX2:
     def __init__(self,model_path,args=None):
@@ -73,7 +53,6 @@ class BiMediX2:
         self.model = model
         self.image_processor = image_processor
         self.max_length = max_length
-        self.conv_template = "llava_llama_3"
 
         self.temperature = args.temperature
         self.top_p = args.top_p
@@ -101,44 +80,55 @@ class BiMediX2:
         model.forward = patched_forward
 
     def process_messages(self,messages):
-        conv = copy.deepcopy(conv_templates[self.conv_template])
-        conv.tokenizer = self.tokenizer
-        conv.messages = []
-        if  "system" in messages:
-            conv.system = messages["system"]
+        # Build messages in standard chat format for Llama-3
+        chat_messages = []
         
+        # Add system message if present
+        if "system" in messages:
+            chat_messages.append({"role": "system", "content": messages["system"]})
+        
+        # Build user message content
+        prompt_text = ""
         imgs = []
+        
         if "image" in messages:
             image = messages["image"]
-            if isinstance(image,str):
+            if isinstance(image, str):
                 image = Image.open(image).convert('RGB')
             else:
                 image = image.convert('RGB')
             imgs.append(image)
-            prompt = DEFAULT_IMAGE_TOKEN + '\n' + messages["prompt"]
+            prompt_text = DEFAULT_IMAGE_TOKEN + '\n' + messages["prompt"]
         elif "images" in messages:
             images = messages["images"]
-            prompt = ""
-            for i,image in enumerate(images):
-                prompt += f"<image_{i+1}>: " + DEFAULT_IMAGE_TOKEN + '\n'
-                if isinstance(image,str):
+            prompt_parts = []
+            for i, image in enumerate(images):
+                prompt_parts.append(f"<image_{i+1}>: " + DEFAULT_IMAGE_TOKEN)
+                if isinstance(image, str):
                     if os.path.exists(image):
                         image = Image.open(image)
                     else:
                         image = download_image(image)
-                elif isinstance(image,Image.Image):
+                elif isinstance(image, Image.Image):
                     image = image.convert("RGB")
                 imgs.append(image)
-            prompt += messages["prompt"]
+            prompt_parts.append(messages["prompt"])
+            prompt_text = '\n'.join(prompt_parts)
         else:
-            prompt = messages["prompt"]
-
-        conv.append_message(conv.roles[0],prompt)
-        conv.append_message(conv.roles[1],None) 
-        prompt = conv.get_prompt()
-
+            prompt_text = messages["prompt"]
+        
+        chat_messages.append({"role": "user", "content": prompt_text})
+        
+        # Use tokenizer's apply_chat_template to format the prompt correctly
+        # This ensures we use the official Llama-3 chat template
+        prompt = self.tokenizer.apply_chat_template(
+            chat_messages,
+            tokenize=False,
+            add_generation_prompt=True
+        )
+        
         imgs = None if len(imgs) == 0 else imgs
-        return prompt,imgs
+        return prompt, imgs
 
 
     def generate_output(self,messages):

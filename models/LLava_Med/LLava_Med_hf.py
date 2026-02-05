@@ -8,7 +8,6 @@ from transformers import AutoConfig, AutoModelForCausalLM, \
 
 
 from .utils import LlavaMistralConfig,LlavaMistralConfig, LlavaMistralForCausalLM,load_pretrained_model, IMAGE_TOKEN_INDEX, DEFAULT_IMAGE_TOKEN, DEFAULT_IM_START_TOKEN, DEFAULT_IM_END_TOKEN,download
-from .conversation import conv_templates, SeparatorStyle
 from .mm_utils import tokenizer_image_token, get_model_name_from_path, KeywordsStoppingCriteria, process_images
 
 AutoConfig.register("llava_mistral", LlavaMistralConfig)
@@ -43,41 +42,55 @@ class LLavaMed:
         self.max_tokens = args.max_new_tokens
 
     def process_messages(self,messages):
-        conv = conv_templates["mistral_instruct"]
-        conv.messages = []
-        if  "system" in messages:
-            conv.system = messages["system"]
+        # Build messages in standard chat format for Mistral
+        chat_messages = []
         
+        # Add system message if present
+        if "system" in messages:
+            chat_messages.append({"role": "system", "content": messages["system"]})
+        
+        # Build user message content
+        prompt_text = ""
         imgs = []
+        
         if "image" in messages:
             image = messages["image"]
-            if isinstance(image,str):
+            if isinstance(image, str):
                 image = Image.open(image).convert('RGB')
             else:
                 image = image.convert('RGB')
             imgs.append(image)
-            prompt = DEFAULT_IMAGE_TOKEN + '\n' + messages["prompt"]
+            prompt_text = DEFAULT_IMAGE_TOKEN + '\n' + messages["prompt"]
         elif "images" in messages:
             images = messages["images"]
-            prompt = ""
-            for i,image in enumerate(images):
-                prompt += f"<image_{i+1}>: " + DEFAULT_IMAGE_TOKEN + '\n'
-                if isinstance(image,str):
+            prompt_parts = []
+            for i, image in enumerate(images):
+                prompt_parts.append(f"<image_{i+1}>: " + DEFAULT_IMAGE_TOKEN)
+                if isinstance(image, str):
                     if os.path.exists(image):
                         image = Image.open(image)
                     else:
                         image = download(image)
-                elif isinstance(image,Image.Image):
+                elif isinstance(image, Image.Image):
                     image = image.convert("RGB")
                 imgs.append(image)
-            prompt += messages["prompt"]
+            prompt_parts.append(messages["prompt"])
+            prompt_text = '\n'.join(prompt_parts)
         else:
-            prompt = messages["prompt"]
-        conv.append_message(conv.roles[0],prompt)
-        conv.append_message(conv.roles[1],None) 
-        prompt = conv.get_prompt()
+            prompt_text = messages["prompt"]
+        
+        chat_messages.append({"role": "user", "content": prompt_text})
+        
+        # Use tokenizer's apply_chat_template to format the prompt correctly
+        # This ensures we use the official Mistral chat template
+        prompt = self.tokenizer.apply_chat_template(
+            chat_messages,
+            tokenize=False,
+            add_generation_prompt=True
+        )
+        
         imgs = None if len(imgs) == 0 else imgs
-        return prompt,imgs
+        return prompt, imgs
 
     @staticmethod
     def pad_sequence_to_max_length(sequence, max_length, padding_value=0):
