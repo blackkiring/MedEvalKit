@@ -23,9 +23,7 @@ def _load_existing_samples(output_file):
         with open(output_file, "r") as f:
             existing_samples = json.load(f)
         if isinstance(existing_samples, list) and len(existing_samples) > 0:
-            # Check if samples have responses
-            if all("response" in s for s in existing_samples):
-                return existing_samples
+            return existing_samples
     except (json.JSONDecodeError, IOError) as e:
         print(f"Warning: Could not load existing samples from {output_file}: {e}")
     

@@ -129,13 +129,25 @@ class BaseDataset:
           remaining_samples, completed_samples = self._filter_remaining_samples(self.samples, existing_results)
           
           # Process only remaining samples
+          new_out_samples = []
           if remaining_samples:
               new_out_samples = self.run(remaining_samples, model)
-              # Combine existing and new results
-              out_samples = completed_samples + new_out_samples
           else:
               print("All samples already processed. Skipping inference.")
-              out_samples = completed_samples
+          
+          # Reconstruct results in original sample order
+          # Build lookup dicts
+          completed_by_key = {self._get_sample_key(s): s for s in completed_samples}
+          new_by_key = {self._get_sample_key(s): s for s in new_out_samples}
+          
+          # Reconstruct in original order
+          out_samples = []
+          for sample in self.samples:
+              key = self._get_sample_key(sample)
+              if key in completed_by_key:
+                  out_samples.append(completed_by_key[key])
+              elif key in new_by_key:
+                  out_samples.append(new_by_key[key])
           
           save_json(results_path,out_samples)
 
@@ -153,13 +165,25 @@ class BaseDataset:
         remaining_samples, completed_samples = self._filter_remaining_samples(self.samples, existing_results)
         
         # Process only remaining samples
+        new_out_samples = []
         if remaining_samples:
             new_out_samples = self.run(remaining_samples, model)
-            # Combine existing and new results
-            out_samples = completed_samples + new_out_samples
         else:
             print(f"Chunk {chunk_idx}: All samples already processed. Skipping inference.")
-            out_samples = completed_samples
+        
+        # Reconstruct results in original sample order
+        # Build lookup dicts
+        completed_by_key = {self._get_sample_key(s): s for s in completed_samples}
+        new_by_key = {self._get_sample_key(s): s for s in new_out_samples}
+        
+        # Reconstruct in original order
+        out_samples = []
+        for sample in self.samples:
+            key = self._get_sample_key(sample)
+            if key in completed_by_key:
+                out_samples.append(completed_by_key[key])
+            elif key in new_by_key:
+                out_samples.append(new_by_key[key])
         
         save_json(results_path,out_samples)
 
