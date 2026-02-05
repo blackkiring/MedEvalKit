@@ -148,6 +148,12 @@ class BaseDataset:
                   out_samples.append(completed_by_key[key])
               elif key in new_by_key:
                   out_samples.append(new_by_key[key])
+              else:
+                  # This shouldn't happen, but handle gracefully
+                  print(f"Warning: Sample with key {key} not found in completed or new results")
+          
+          if len(out_samples) != len(self.samples):
+              print(f"Warning: Result count mismatch. Expected {len(self.samples)}, got {len(out_samples)}")
           
           save_json(results_path,out_samples)
 
@@ -184,6 +190,12 @@ class BaseDataset:
                 out_samples.append(completed_by_key[key])
             elif key in new_by_key:
                 out_samples.append(new_by_key[key])
+            else:
+                # This shouldn't happen, but handle gracefully
+                print(f"Warning: Sample with key {key} not found in completed or new results")
+        
+        if len(out_samples) != len(self.samples):
+            print(f"Warning: Result count mismatch. Expected {len(self.samples)}, got {len(out_samples)}")
         
         save_json(results_path,out_samples)
 
