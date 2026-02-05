@@ -89,25 +89,22 @@ class BaseDataset:
       if not existing_results:
           return samples, []
       
-      # Build a set of processed sample keys
-      processed_keys = set()
+      # Build a dict of processed sample keys to results
+      processed_results = {}
       for result in existing_results:
           # Only consider completed samples (those with responses)
           if "response" in result:
               key = self._get_sample_key(result)
-              processed_keys.add(key)
+              processed_results[key] = result
       
-      # Filter samples
+      # Filter samples and build ordered lists
       remaining_samples = []
-      existing_samples = []
+      existing_samples_ordered = []
       for sample in samples:
           key = self._get_sample_key(sample)
-          if key in processed_keys:
-              # Find the matching result from existing results
-              for result in existing_results:
-                  if "response" in result and self._get_sample_key(result) == key:
-                      existing_samples.append(result)
-                      break
+          if key in processed_results:
+              # Keep in original order
+              existing_samples_ordered.append(processed_results[key])
           else:
               remaining_samples.append(sample)
       
@@ -115,7 +112,7 @@ class BaseDataset:
           print(f"Resume: Skipping {len(samples) - len(remaining_samples)} already-processed samples")
           print(f"Resume: Processing {len(remaining_samples)} remaining samples")
       
-      return remaining_samples, existing_samples
+      return remaining_samples, existing_samples_ordered
 
   def eval(self):
       model = self.model

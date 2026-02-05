@@ -35,17 +35,20 @@ def run_model(samples, model, existing_samples=None):
     """Run model on samples, skipping already processed ones if existing_samples provided."""
     # If we have existing samples, filter out already-processed ones
     if existing_samples:
-        existing_ids = {s["id"] for s in existing_samples if "response" in s}
-        remaining_samples = [s for s in samples if s["id"] not in existing_ids]
+        existing_by_id = {s["id"]: s for s in existing_samples if "response" in s}
+        remaining_samples = [s for s in samples if s["id"] not in existing_by_id]
         
         if len(remaining_samples) < len(samples):
             print(f"Resume: Skipping {len(samples) - len(remaining_samples)} already-processed samples")
             print(f"Resume: Processing {len(remaining_samples)} remaining samples")
         
-        samples = remaining_samples
+        samples_to_process = remaining_samples
+    else:
+        samples_to_process = samples
+        existing_by_id = {}
     
-    out_samples = []
-    if not samples:
+    new_out_samples = []
+    if not samples_to_process:
         print("All samples already processed. Skipping inference.")
         return existing_samples if existing_samples else []
     
@@ -53,7 +56,7 @@ def run_model(samples, model, existing_samples=None):
         messages_list = []
         current_messages = []
         current_samples = []
-        for sample in tqdm(samples):
+        for sample in tqdm(samples_to_process):
             messages = {"prompt":sample["final_input_prompt"],"images":sample["images"]}
             current_messages.append(messages)
             current_samples.append(sample)
@@ -85,13 +88,23 @@ def run_model(samples, model, existing_samples=None):
                 else:  # open question
                     out_sample["response"] = response
                     out_sample["parsed_pred"] = response
-                out_samples.append(out_sample)
+                new_out_samples.append(out_sample)
     
-    # Combine existing and new samples
-    if existing_samples:
-        out_samples = existing_samples + out_samples
+    # Combine in the original sample order
+    if existing_by_id:
+        # Build dict of new results by ID
+        new_by_id = {s["id"]: s for s in new_out_samples}
+        # Reconstruct in original order
+        out_samples = []
+        for sample in samples:
+            sample_id = sample["id"]
+            if sample_id in existing_by_id:
+                out_samples.append(existing_by_id[sample_id])
+            elif sample_id in new_by_id:
+                out_samples.append(new_by_id[sample_id])
+        return out_samples
     
-    return out_samples
+    return new_out_samples
 
 
 def eval_MMMU_val(model,dataset_path,output_path,subset):

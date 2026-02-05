@@ -33,25 +33,25 @@ def test_resume_logic():
         if not existing_results:
             return samples, []
         
-        processed_keys = set()
+        # Build a dict of processed sample keys to results
+        processed_results = {}
         for result in existing_results:
             if "response" in result:
                 key = _get_sample_key(result)
-                processed_keys.add(key)
+                processed_results[key] = result
         
+        # Filter samples and build ordered lists
         remaining_samples = []
-        existing_samples = []
+        existing_samples_ordered = []
         for sample in samples:
             key = _get_sample_key(sample)
-            if key in processed_keys:
-                for result in existing_results:
-                    if "response" in result and _get_sample_key(result) == key:
-                        existing_samples.append(result)
-                        break
+            if key in processed_results:
+                # Keep in original order
+                existing_samples_ordered.append(processed_results[key])
             else:
                 remaining_samples.append(sample)
         
-        return remaining_samples, existing_samples
+        return remaining_samples, existing_samples_ordered
     
     # Test sample key generation
     sample1 = {"id": "123", "question": "Q1"}
@@ -226,6 +226,82 @@ def test_chunk_completion_detection():
         print(f"✓ Merged {len(merged_results)} samples from all chunks")
 
 
+def test_ordering_preserved():
+    """Test that sample ordering is preserved during resume."""
+    print("\n=== Test: Ordering Preserved ===")
+    
+    # Test sample key generation
+    def _get_sample_key(sample):
+        if "id" in sample:
+            return f"id:{sample['id']}"
+        if "question" in sample and "answer" in sample:
+            content = str(sample['question']) + str(sample['answer'])
+            hash_value = hashlib.sha256(content.encode()).hexdigest()
+            return f"qa:{hash_value}"
+        content = json.dumps(sample, sort_keys=True)
+        hash_value = hashlib.sha256(content.encode()).hexdigest()
+        return f"hash:{hash_value}"
+    
+    def _filter_remaining_samples(samples, existing_results):
+        if not existing_results:
+            return samples, []
+        
+        processed_results = {}
+        for result in existing_results:
+            if "response" in result:
+                key = _get_sample_key(result)
+                processed_results[key] = result
+        
+        remaining_samples = []
+        existing_samples_ordered = []
+        for sample in samples:
+            key = _get_sample_key(sample)
+            if key in processed_results:
+                existing_samples_ordered.append(processed_results[key])
+            else:
+                remaining_samples.append(sample)
+        
+        return remaining_samples, existing_samples_ordered
+    
+    # Create samples in specific order
+    all_samples = [
+        {"id": "1", "question": "Q1"},
+        {"id": "2", "question": "Q2"},
+        {"id": "3", "question": "Q3"},
+        {"id": "4", "question": "Q4"},
+    ]
+    
+    # Simulate existing results for samples 2 and 4 (out of order in file)
+    existing_results = [
+        {"id": "4", "question": "Q4", "response": "R4"},
+        {"id": "2", "question": "Q2", "response": "R2"},
+    ]
+    
+    remaining, existing = _filter_remaining_samples(all_samples, existing_results)
+    
+    # Verify remaining samples
+    assert len(remaining) == 2, f"Expected 2 remaining, got {len(remaining)}"
+    assert remaining[0]["id"] == "1", "First remaining should be sample 1"
+    assert remaining[1]["id"] == "3", "Second remaining should be sample 3"
+    print("✓ Remaining samples in correct order")
+    
+    # Verify existing samples are in original order
+    assert len(existing) == 2, f"Expected 2 existing, got {len(existing)}"
+    assert existing[0]["id"] == "2", "First existing should be sample 2 (original order)"
+    assert existing[1]["id"] == "4", "Second existing should be sample 4 (original order)"
+    print("✓ Existing samples in original order (not file order)")
+    
+    # Simulate combining results
+    combined = existing + [{"id": "1", "response": "R1"}, {"id": "3", "response": "R3"}]
+    
+    # Verify combined order matches original sample order
+    assert combined[0]["id"] == "2", "First in combined should be sample 2"
+    assert combined[1]["id"] == "4", "Second in combined should be sample 4"
+    assert combined[2]["id"] == "1", "Third in combined should be sample 1"
+    assert combined[3]["id"] == "3", "Fourth in combined should be sample 3"
+    print("✓ Combined results maintain relative ordering")
+
+
 def main():
     """Run all tests."""
     print("=" * 60)
@@ -237,6 +313,7 @@ def main():
         test_file_operations,
         test_incremental_results,
         test_chunk_completion_detection,
+        test_ordering_preserved,
     ]
     
     failed = []
