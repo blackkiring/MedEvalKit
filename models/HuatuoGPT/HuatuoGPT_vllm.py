@@ -2,8 +2,7 @@ import os
 
 from PIL import Image
 from vllm import LLM, SamplingParams
-from transformers import AutoConfig, AutoModelForCausalLM,LlavaProcessor
-from .conversation import conv_templates
+from transformers import AutoConfig, AutoModelForCausalLM, AutoTokenizer, LlavaProcessor
 from .model.language_model.llava_qwen2 import LlavaQwenConfig,LlavaQwenConfig, LlavaQwen2ForCausalLM
 from .model.language_model.llava_llama import LlavaLlamaModel, LlavaLlamaForCausalLM,LlavaConfig
 from .model.constants import DEFAULT_IMAGE_TOKEN
@@ -25,6 +24,9 @@ class HuatuoGPT:
             tensor_parallel_size= int(os.environ.get("tensor_parallel_size",1)),
             # limit_mm_per_prompt = {"image": int(os.environ.get("max_image_num",1))},
         )
+        
+        # Load tokenizer to check if it has official chat template
+        self.tokenizer = AutoTokenizer.from_pretrained(model_path, trust_remote_code=True)
 
         self.sampling_params = SamplingParams(
             temperature=args.temperature,
@@ -36,20 +38,22 @@ class HuatuoGPT:
 
 
     def process_messages(self,messages):
-        conv = conv_templates["huatuo"].copy()
-        conv.messages = []
-        if "system" in messages:
-            conv.system = "<|system|>" + messages["system"]
-        else:
-            conv.system = ""
+        # Build messages in standard chat format
+        chat_messages = []
         
+        # Add system message if present
+        if "system" in messages:
+            chat_messages.append({"role": "system", "content": messages["system"]})
+        
+        # Build user message content
+        prompt_text = ""
         imgs = []
+        
         if "image" in messages:
             text = messages["prompt"]
-            inp = DEFAULT_IMAGE_TOKEN + '\n' + text
-            conv.append_message(conv.roles[0],inp)
+            prompt_text = DEFAULT_IMAGE_TOKEN + '\n' + text
             image = messages["image"]
-            if isinstance(image,str):
+            if isinstance(image, str):
                 if os.path.exists(image):
                     image = Image.open(image)
                 else:
@@ -58,32 +62,50 @@ class HuatuoGPT:
         elif "images" in messages:
             text = messages["prompt"]
             images = messages["images"]
-            inp = ""
-            for i,image in enumerate(images):
-                inp = inp + f"<image_{i+1}>: " + DEFAULT_IMAGE_TOKEN + '\n'
-                if isinstance(image,str):
+            prompt_parts = []
+            for i, image in enumerate(images):
+                prompt_parts.append(f"<image_{i+1}>: " + DEFAULT_IMAGE_TOKEN)
+                if isinstance(image, str):
                     if os.path.exists(image):
                         image = Image.open(image)
                     else:
                         image = download(image)
-                elif isinstance(image,Image.Image):
+                elif isinstance(image, Image.Image):
                     image = image.convert("RGB")
                 imgs.append(image)
-            inp = inp + text
-            conv.append_message(conv.roles[0],inp)
+            prompt_parts.append(text)
+            prompt_text = '\n'.join(prompt_parts)
         else:
-            text = messages["prompt"]
-            inp = text
-            conv.append_message(conv.roles[0],inp)
+            prompt_text = messages["prompt"]
         
-        conv.append_message(conv.roles[1],None) 
-        prompt = conv.get_prompt()
+        chat_messages.append({"role": "user", "content": prompt_text})
+        
+        # Use tokenizer's apply_chat_template if available
+        # This ensures we use the official chat template from the model
+        try:
+            prompt = self.tokenizer.apply_chat_template(
+                chat_messages,
+                tokenize=False,
+                add_generation_prompt=True
+            )
+        except Exception:
+            # Fallback: if apply_chat_template fails, use basic formatting
+            # This happens when tokenizer doesn't have a chat_template defined
+            from .conversation import conv_templates
+            conv = conv_templates["huatuo"].copy()
+            conv.messages = []
+            if "system" in messages:
+                conv.system = "<|system|>" + messages["system"]
+            else:
+                conv.system = ""
+            conv.append_message(conv.roles[0], prompt_text)
+            conv.append_message(conv.roles[1], None)
+            prompt = conv.get_prompt()
 
         mm_data = {}
         # print(len(imgs))
         if len(imgs) > 0:
             mm_data["image"] = imgs
-
 
         llm_inputs = {
             "prompt": prompt,
