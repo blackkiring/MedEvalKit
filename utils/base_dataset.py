@@ -1,6 +1,7 @@
 import torch
 import os
 import json
+import hashlib
 
 from tqdm import tqdm
 import gc
@@ -51,6 +52,68 @@ class BaseDataset:
   def construct_messages(self):
     pass
 
+  def _load_existing_results(self, results_path):
+      """Load existing results from file if it exists and is valid."""
+      if not os.path.exists(results_path):
+          return None
+      
+      try:
+          with open(results_path, "r") as f:
+              existing_results = json.load(f)
+          if isinstance(existing_results, list) and len(existing_results) > 0:
+              print(f"Found existing results with {len(existing_results)} samples at {results_path}")
+              return existing_results
+      except (json.JSONDecodeError, IOError) as e:
+          print(f"Warning: Could not load existing results from {results_path}: {e}")
+          return None
+      
+      return None
+  
+  def _get_sample_key(self, sample):
+      """Generate a unique key for a sample to identify duplicates."""
+      # Try common unique identifiers
+      if "id" in sample:
+          return f"id:{sample['id']}"
+      if "question" in sample and "answer" in sample:
+          # Use stable hash that's consistent across restarts
+          content = str(sample['question']) + str(sample['answer'])
+          hash_value = hashlib.sha256(content.encode()).hexdigest()
+          return f"qa:{hash_value}"
+      # Fallback to full sample hash
+      content = json.dumps(sample, sort_keys=True)
+      hash_value = hashlib.sha256(content.encode()).hexdigest()
+      return f"hash:{hash_value}"
+  
+  def _filter_remaining_samples(self, samples, existing_results):
+      """Filter out samples that have already been processed."""
+      if not existing_results:
+          return samples, []
+      
+      # Build a dict of processed sample keys to results
+      processed_results = {}
+      for result in existing_results:
+          # Only consider completed samples (those with responses)
+          if "response" in result:
+              key = self._get_sample_key(result)
+              processed_results[key] = result
+      
+      # Filter samples and build ordered lists
+      remaining_samples = []
+      existing_samples_ordered = []
+      for sample in samples:
+          key = self._get_sample_key(sample)
+          if key in processed_results:
+              # Keep in original order
+              existing_samples_ordered.append(processed_results[key])
+          else:
+              remaining_samples.append(sample)
+      
+      if len(remaining_samples) < len(samples):
+          print(f"Resume: Skipping {len(samples) - len(remaining_samples)} already-processed samples")
+          print(f"Resume: Processing {len(remaining_samples)} remaining samples")
+      
+      return remaining_samples, existing_samples_ordered
+
   def eval(self):
       model = self.model
       dataset_path = self.dataset_path
@@ -60,7 +123,38 @@ class BaseDataset:
       if num_chunks == 1:
           results_path = os.path.join(output_path,"results.json")
           matric_path = os.path.join(output_path,"metrics.json")
-          out_samples = self.run(self.samples,model)
+          
+          # Check for existing results and resume if found
+          existing_results = self._load_existing_results(results_path)
+          remaining_samples, completed_samples = self._filter_remaining_samples(self.samples, existing_results)
+          
+          # Process only remaining samples
+          new_out_samples = []
+          if remaining_samples:
+              new_out_samples = self.run(remaining_samples, model)
+          else:
+              print("All samples already processed. Skipping inference.")
+          
+          # Reconstruct results in original sample order
+          # Build lookup dicts
+          completed_by_key = {self._get_sample_key(s): s for s in completed_samples}
+          new_by_key = {self._get_sample_key(s): s for s in new_out_samples}
+          
+          # Reconstruct in original order
+          out_samples = []
+          for sample in self.samples:
+              key = self._get_sample_key(sample)
+              if key in completed_by_key:
+                  out_samples.append(completed_by_key[key])
+              elif key in new_by_key:
+                  out_samples.append(new_by_key[key])
+              else:
+                  # This shouldn't happen, but handle gracefully
+                  print(f"Warning: Sample with key {key} not found in completed or new results")
+          
+          if len(out_samples) != len(self.samples):
+              print(f"Warning: Result count mismatch. Expected {len(self.samples)}, got {len(out_samples)}")
+          
           save_json(results_path,out_samples)
 
           metrics,out_samples = self.cal_metrics(out_samples)
@@ -71,7 +165,38 @@ class BaseDataset:
       elif num_chunks > 1:
         results_path = os.path.join(output_path,f"results_{chunk_idx}.json")
         final_results_path = os.path.join(output_path,"results.json")
-        out_samples = self.run(self.samples,model)
+        
+        # Check for existing chunk results and resume if found
+        existing_results = self._load_existing_results(results_path)
+        remaining_samples, completed_samples = self._filter_remaining_samples(self.samples, existing_results)
+        
+        # Process only remaining samples
+        new_out_samples = []
+        if remaining_samples:
+            new_out_samples = self.run(remaining_samples, model)
+        else:
+            print(f"Chunk {chunk_idx}: All samples already processed. Skipping inference.")
+        
+        # Reconstruct results in original sample order
+        # Build lookup dicts
+        completed_by_key = {self._get_sample_key(s): s for s in completed_samples}
+        new_by_key = {self._get_sample_key(s): s for s in new_out_samples}
+        
+        # Reconstruct in original order
+        out_samples = []
+        for sample in self.samples:
+            key = self._get_sample_key(sample)
+            if key in completed_by_key:
+                out_samples.append(completed_by_key[key])
+            elif key in new_by_key:
+                out_samples.append(new_by_key[key])
+            else:
+                # This shouldn't happen, but handle gracefully
+                print(f"Warning: Sample with key {key} not found in completed or new results")
+        
+        if len(out_samples) != len(self.samples):
+            print(f"Warning: Result count mismatch. Expected {len(self.samples)}, got {len(out_samples)}")
+        
         save_json(results_path,out_samples)
 
         total_results_path = os.listdir(output_path)

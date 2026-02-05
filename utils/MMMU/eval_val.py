@@ -1,6 +1,7 @@
 import torch
 import os
 import random
+import json
 
 import numpy as np
 from tqdm import tqdm
@@ -13,13 +14,47 @@ from .data_utils import load_yaml, construct_prompt, save_json, process_single_s
 from .eval_utils import evaluate,parse_multi_choice_response, parse_open_response
 from ..utils import extract
 
-def run_model(samples, model,):
-    out_samples = []
+def _load_existing_samples(output_file):
+    """Load existing processed samples if file exists."""
+    if not os.path.exists(output_file):
+        return None
+    
+    try:
+        with open(output_file, "r") as f:
+            existing_samples = json.load(f)
+        if isinstance(existing_samples, list) and len(existing_samples) > 0:
+            return existing_samples
+    except (json.JSONDecodeError, IOError) as e:
+        print(f"Warning: Could not load existing samples from {output_file}: {e}")
+    
+    return None
+
+def run_model(samples, model, existing_samples=None):
+    """Run model on samples, skipping already processed ones if existing_samples provided."""
+    # If we have existing samples, filter out already-processed ones
+    if existing_samples:
+        existing_by_id = {s["id"]: s for s in existing_samples if "response" in s}
+        remaining_samples = [s for s in samples if s["id"] not in existing_by_id]
+        
+        if len(remaining_samples) < len(samples):
+            print(f"Resume: Skipping {len(samples) - len(remaining_samples)} already-processed samples")
+            print(f"Resume: Processing {len(remaining_samples)} remaining samples")
+        
+        samples_to_process = remaining_samples
+    else:
+        samples_to_process = samples
+        existing_by_id = {}
+    
+    new_out_samples = []
+    if not samples_to_process:
+        print("All samples already processed. Skipping inference.")
+        return existing_samples if existing_samples else []
+    
     with torch.no_grad():
         messages_list = []
         current_messages = []
         current_samples = []
-        for sample in tqdm(samples):
+        for sample in tqdm(samples_to_process):
             messages = {"prompt":sample["final_input_prompt"],"images":sample["images"]}
             current_messages.append(messages)
             current_samples.append(sample)
@@ -51,8 +86,23 @@ def run_model(samples, model,):
                 else:  # open question
                     out_sample["response"] = response
                     out_sample["parsed_pred"] = response
-                out_samples.append(out_sample)
-    return out_samples
+                new_out_samples.append(out_sample)
+    
+    # Combine in the original sample order
+    if existing_by_id:
+        # Build dict of new results by ID
+        new_by_id = {s["id"]: s for s in new_out_samples}
+        # Reconstruct in original order
+        out_samples = []
+        for sample in samples:
+            sample_id = sample["id"]
+            if sample_id in existing_by_id:
+                out_samples.append(existing_by_id[sample_id])
+            elif sample_id in new_by_id:
+                out_samples.append(new_by_id[sample_id])
+        return out_samples
+    
+    return new_out_samples
 
 
 def eval_MMMU_val(model,dataset_path,output_path,subset):
@@ -69,8 +119,14 @@ def eval_MMMU_val(model,dataset_path,output_path,subset):
             sample = construct_prompt(sample)
             sub_samples.append(sample)
 
-        eval_samples = run_model(sub_samples, model)
-        save_json(os.path.join(eval_sub_path,"output_sample.json"), eval_samples)
+        # Check for existing results to enable resume
+        output_sample_path = os.path.join(eval_sub_path,"output_sample.json")
+        existing_samples = _load_existing_samples(output_sample_path)
+        if existing_samples:
+            print(f"Found {len(existing_samples)} existing samples for {subject}")
+        
+        eval_samples = run_model(sub_samples, model, existing_samples)
+        save_json(output_sample_path, eval_samples)
         judge_dict, metric_dict = evaluate(eval_samples)
         metric_dict.update({"num_example": len(eval_samples)})
         for eval_sample in eval_samples:
