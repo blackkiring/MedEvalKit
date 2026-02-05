@@ -39,6 +39,8 @@ class InternVL:
             max_model_len=8192,  # Limit context length
         )
         self.processor = AutoProcessor.from_pretrained(model_path,trust_remote_code=True)
+        # Get tokenizer from processor for apply_chat_template
+        self.tokenizer = self.processor.tokenizer
 
         self.sampling_params = SamplingParams(
             temperature=args.temperature,
@@ -87,9 +89,9 @@ class InternVL:
             
             chat_messages.append({"role": "user", "content": user_content})
         
-        # Use processor's apply_chat_template to format the prompt correctly
+        # Use tokenizer's apply_chat_template to format the prompt correctly
         # This ensures we use the official InternVL chat template
-        prompt = self.processor.apply_chat_template(
+        prompt = self.tokenizer.apply_chat_template(
             chat_messages,
             tokenize=False,
             add_generation_prompt=True
